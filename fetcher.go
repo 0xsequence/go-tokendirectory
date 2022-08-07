@@ -35,6 +35,21 @@ func (f *fetcher) Run(ctx context.Context) error {
 	return nil
 }
 
+func (f *fetcher) GetContractInfo(ctx context.Context, chainId uint64, contractAddr prototyp.Hash) (*ContractInfo, error) {
+	if f.chainId != chainId {
+		return nil, fmt.Errorf("chain ID mismatch: %v != %v", f.chainId, chainId)
+	}
+
+	f.contractsMu.RLock()
+	defer f.contractsMu.RUnlock()
+
+	if info, ok := f.contracts[contractAddr]; ok {
+		return info, nil
+	}
+
+	return nil, nil
+}
+
 func (f *fetcher) listUpdater(ctx context.Context) {
 	defer f.ticker.Stop()
 	for {
