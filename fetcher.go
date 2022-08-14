@@ -14,7 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type fetcher struct {
+type Fetcher struct {
 	chainId uint64
 
 	ticker *time.Ticker
@@ -23,19 +23,19 @@ type fetcher struct {
 	lists     map[string]*TokenList
 	contracts map[prototyp.Hash]*ContractInfo
 
-	updateFunc  func(contractInfo ContractInfo) error
+	updateFunc  func(ctx context.Context, contractInfo *ContractInfo) error
 	updateMu    sync.Mutex
 	contractsMu sync.RWMutex
 }
 
-func (f *fetcher) Run(ctx context.Context) error {
+func (f *Fetcher) Run(ctx context.Context) error {
 	// TODO: consider running this as a goroutine, as long lists will take a long time
-	f.updateLists()
+	f.updateLists(ctx)
 	go f.listUpdater(ctx)
 	return nil
 }
 
-func (f *fetcher) GetContractInfo(ctx context.Context, chainId uint64, contractAddr prototyp.Hash) (*ContractInfo, error) {
+func (f *Fetcher) GetContractInfo(ctx context.Context, chainId uint64, contractAddr prototyp.Hash) (*ContractInfo, error) {
 	if f.chainId != chainId {
 		return nil, fmt.Errorf("chain ID mismatch: %v != %v", f.chainId, chainId)
 	}
@@ -50,19 +50,19 @@ func (f *fetcher) GetContractInfo(ctx context.Context, chainId uint64, contractA
 	return nil, nil
 }
 
-func (f *fetcher) listUpdater(ctx context.Context) {
+func (f *Fetcher) listUpdater(ctx context.Context) {
 	defer f.ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-f.ticker.C:
-			f.updateLists()
+			f.updateLists(ctx)
 		}
 	}
 }
 
-func (f *fetcher) updateLists() {
+func (f *Fetcher) updateLists(ctx context.Context) {
 	f.updateMu.Lock()
 	defer f.updateMu.Unlock()
 
@@ -97,7 +97,9 @@ func (f *fetcher) updateLists() {
 				continue
 			}
 
-			err = f.updateFunc(contractInfo)
+			// this is a function that will be called when the contract info is updated
+			// run it as a goroutine so that it doesn't block the update loop
+			go f.updateFunc(ctx, &contractInfo)
 
 			if err != nil {
 				log.Warn().Err(err).Msgf("failed to execute update function for address %q chain %v", contractInfo.Address, contractInfo.ChainID)
@@ -105,14 +107,13 @@ func (f *fetcher) updateLists() {
 			f.contractsMu.Lock()
 			f.contracts[prototyp.HashFromString(contractInfo.Address)] = &contractInfo
 			f.contractsMu.Unlock()
-
 			seen[contractInfo.Address] = true
 
 		}
 	}
 }
 
-func (f *fetcher) fetchTokenList(source string) (*TokenList, error) {
+func (f *Fetcher) fetchTokenList(source string) (*TokenList, error) {
 	log.Debug().Msgf("fetching tokens from source %q", source)
 
 	httpClient := http.DefaultClient

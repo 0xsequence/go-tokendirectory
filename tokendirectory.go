@@ -1,17 +1,18 @@
 package tokendirectory
 
 import (
+	"context"
 	"time"
 
 	"github.com/0xsequence/go-sequence/lib/prototyp"
 )
 
-func NewTokenDirectoryFetcher(chainID uint64, sources []string, updateFunc func(contractInfo ContractInfo) error, durationForUpdates time.Duration) (*fetcher, error) {
+func NewTokenDirectoryFetcher(chainID uint64, sources []string, updateFunc func(ctx context.Context, contractInfo *ContractInfo) error, durationForUpdates time.Duration) (*Fetcher, error) {
 	if durationForUpdates == 0 {
 		durationForUpdates = time.Minute * 15
 	}
 
-	f := &fetcher{
+	f := &Fetcher{
 		chainId:    chainID,
 		ticker:     time.NewTicker(durationForUpdates),
 		lists:      make(map[string]*TokenList),
