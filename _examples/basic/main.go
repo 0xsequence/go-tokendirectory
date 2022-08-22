@@ -11,7 +11,7 @@ import (
 func main() {
 	fmt.Println("Starting Program...")
 
-	updateFunc := func(contractInfo *tokendirectory.ContractInfo) error {
+	updateFunc := func(ctx context.Context, contractInfo *tokendirectory.ContractInfo) error {
 		fmt.Printf("updating %v\n", contractInfo.Address)
 		return nil
 	}
