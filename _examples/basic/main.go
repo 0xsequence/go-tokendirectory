@@ -10,13 +10,12 @@ import (
 
 func main() {
 	fmt.Println("Starting Program...")
-
 	updateFunc := func(ctx context.Context, contractInfo *tokendirectory.ContractInfo) error {
 		fmt.Printf("updating %v\n", contractInfo.Address)
 		return nil
 	}
 
-	tokenDirectoryFetcher, err := tokendirectory.NewTokenDirectoryFetcher(1, tokendirectory.DefaultTokenDirectorySources, updateFunc, time.Second*30)
+	tokenDirectoryFetcher, err := tokendirectory.NewTokenDirectoryFetcher(tokendirectory.DefaultTokenDirectorySources, updateFunc, time.Second*30)
 	if err != nil {
 		panic(err)
 	}

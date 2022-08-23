@@ -28,9 +28,17 @@ type TokenDirectory struct {
 }
 
 func (f *TokenDirectory) Run(ctx context.Context) error {
-	// TODO: consider running this as a goroutine, as long lists will take a long time
-	f.updateLists(ctx)
-	go f.listUpdater(ctx)
+	wg := &sync.WaitGroup{}
+	for chainID := range f.sources {
+		wg.Add(1)
+		go func(chainID uint64) {
+			defer wg.Done()
+			// TODO: consider running this as a goroutine, as long lists will take a long time
+			f.updateLists(ctx, chainID)
+			go f.listUpdater(ctx, chainID)
+		}(chainID)
+	}
+	wg.Wait()
 	return nil
 }
 
@@ -49,77 +57,73 @@ func (f *TokenDirectory) GetContractInfo(ctx context.Context, chainId uint64, co
 	return nil, errors.New("contract not found")
 }
 
-func (f *TokenDirectory) listUpdater(ctx context.Context) {
+func (f *TokenDirectory) listUpdater(ctx context.Context, chainID uint64) {
 	defer f.ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-f.ticker.C:
-			f.updateLists(ctx)
+			f.updateLists(ctx, chainID)
 		}
 	}
 }
 
-func (f *TokenDirectory) updateLists(ctx context.Context) {
+func (f *TokenDirectory) updateLists(ctx context.Context, chainID uint64) {
 	f.updateMu.Lock()
 	defer f.updateMu.Unlock()
 
-	seen := map[uint64]map[string]bool{}
-	for chainID, sources := range f.sources {
+	seen := map[string]bool{}
+	f.contractsMu.Lock()
+	if _, ok := f.lists[chainID]; !ok {
+		f.lists[chainID] = make(map[string]*TokenList)
+	}
+	if _, ok := f.contracts[chainID]; !ok {
+		f.contracts[chainID] = make(map[prototyp.Hash]*ContractInfo)
+	}
+	f.contractsMu.Unlock()
 
-		if _, ok := seen[chainID]; !ok {
-			seen[chainID] = make(map[string]bool)
-		}
-		if _, ok := f.lists[chainID]; !ok {
-			f.lists[chainID] = make(map[string]*TokenList)
-		}
-		if _, ok := f.contracts[chainID]; !ok {
-			f.contracts[chainID] = make(map[prototyp.Hash]*ContractInfo)
+	for _, source := range f.sources[chainID] {
+		tokenList, err := f.fetchTokenList(source)
+		if err != nil {
+			log.Warn().Err(err).Msgf("failed to fetch from source %q", source)
+			continue
 		}
 
-		for _, source := range sources {
-			tokenList, err := f.fetchTokenList(source)
-			if err != nil {
-				log.Warn().Err(err).Msgf("failed to fetch from source %q", source)
+		f.lists[chainID][source] = tokenList
+
+		for i := range tokenList.Tokens {
+			contractInfo := tokenList.Tokens[i]
+
+			if contractInfo.Name == "" || contractInfo.Address == "" {
+				continue
+			}
+			if contractInfo.ChainID != chainID {
 				continue
 			}
 
-			f.lists[chainID][source] = tokenList
-
-			for i := range tokenList.Tokens {
-				contractInfo := tokenList.Tokens[i]
-
-				if contractInfo.Name == "" || contractInfo.Address == "" {
-					continue
-				}
-				if contractInfo.ChainID != chainID {
-					continue
-				}
-
-				if contractInfo.Type == "" {
-					contractInfo.Type = strings.ToUpper(tokenList.TokenStandard)
-				}
-
-				contractInfo.Address = strings.ToLower(contractInfo.Address)
-
-				if seen[chainID][contractInfo.Address] {
-					// do not overwrite tokens that belong to a previous list
-					continue
-				}
-
-				// this is a function that will be called when the contract info is updated
-				// run it as a goroutine so that it doesn't block the update loop
-				go f.updateFunc(ctx, &contractInfo)
-
-				if err != nil {
-					log.Warn().Err(err).Msgf("failed to execute update function for address %q chain %v", contractInfo.Address, contractInfo.ChainID)
-				}
-				f.contractsMu.Lock()
-				f.contracts[chainID][prototyp.HashFromString(contractInfo.Address)] = &contractInfo
-				f.contractsMu.Unlock()
-				seen[chainID][contractInfo.Address] = true
+			if contractInfo.Type == "" {
+				contractInfo.Type = strings.ToUpper(tokenList.TokenStandard)
 			}
+
+			contractInfo.Address = strings.ToLower(contractInfo.Address)
+
+			if seen[contractInfo.Address] {
+				// do not overwrite tokens that belong to a previous list
+				continue
+			}
+
+			// this is a function that will be called when the contract info is updated
+			// run it as a goroutine so that it doesn't block the update loop
+			go f.updateFunc(ctx, &contractInfo)
+
+			if err != nil {
+				log.Warn().Err(err).Msgf("failed to execute update function for address %q chain %v", contractInfo.Address, contractInfo.ChainID)
+			}
+			f.contractsMu.Lock()
+			f.contracts[chainID][prototyp.HashFromString(contractInfo.Address)] = &contractInfo
+			f.contractsMu.Unlock()
+			seen[contractInfo.Address] = true
 		}
 	}
 }
