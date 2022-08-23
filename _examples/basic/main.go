@@ -16,7 +16,7 @@ func main() {
 		return nil
 	}
 
-	tokenDirectoryFetcher, err := tokendirectory.NewTokenDirectoryFetcher(1, tokendirectory.DefaultTokenDirectorySources[1], updateFunc, time.Second*30)
+	tokenDirectoryFetcher, err := tokendirectory.NewTokenDirectoryFetcher(1, tokendirectory.DefaultTokenDirectorySources, updateFunc, time.Second*30)
 	if err != nil {
 		panic(err)
 	}
