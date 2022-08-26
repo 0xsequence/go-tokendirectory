@@ -11,6 +11,7 @@ type TokenList struct {
 	Keywords      []string       `json:"keywords"`
 	Timestamp     *time.Time     `json:"timestamp"`
 	Tokens        []ContractInfo `json:"tokens"`
+	Version       interface{}    `json:"version"`
 }
 
 type ContractInfo struct {
