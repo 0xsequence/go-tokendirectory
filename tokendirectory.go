@@ -11,6 +11,11 @@ func NewTokenDirectoryFetcher(sources map[uint64][]string, updateFunc func(ctx c
 	if durationForUpdates == 0 {
 		durationForUpdates = time.Minute * 15
 	}
+	if updateFunc == nil {
+		updateFunc = func(ctx context.Context, contractInfo *ContractInfo) error {
+			return nil
+		}
+	}
 	lists := make(map[uint64]map[string]*TokenList)
 	contracts := make(map[uint64]map[prototyp.Hash]*ContractInfo)
 	for chainId, _ := range sources {

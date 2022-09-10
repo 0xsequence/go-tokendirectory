@@ -57,6 +57,17 @@ func (f *TokenDirectory) GetContractInfo(ctx context.Context, chainId uint64, co
 	return nil, errors.New("contract not found")
 }
 
+func (f *TokenDirectory) GetAllTokens(ctx context.Context) ([]ContractInfo, error) {
+	var tokens []ContractInfo
+	for _, info := range f.lists {
+		for _, tokenList := range info {
+			tokens = append(tokens, tokenList.Tokens...)
+		}
+	}
+
+	return tokens, nil
+}
+
 func (f *TokenDirectory) listUpdater(ctx context.Context, chainID uint64) {
 	defer f.ticker.Stop()
 	for {
