@@ -9,23 +9,26 @@ import (
 )
 
 func main() {
-	fmt.Println("Starting Program...")
-	updateFunc := func(ctx context.Context, contractInfo *tokendirectory.ContractInfo) error {
-		fmt.Printf("updating %v\n", contractInfo.Address)
-		return nil
+	fmt.Println("go-tokendirectory example starting..")
+
+	updateFunc := func(ctx context.Context, chainID uint64, contractInfoList []tokendirectory.ContractInfo) {
+		for _, contractInfo := range contractInfoList {
+			fmt.Printf("updating %v\n", contractInfo.Address)
+		}
 	}
 
-	tokenDirectoryFetcher, err := tokendirectory.NewTokenDirectoryFetcher(tokendirectory.DefaultTokenDirectorySources, updateFunc, time.Second*30)
+	tokenDirectory, err := tokendirectory.NewTokenDirectory(tokendirectory.DefaultSources, time.Second*30, updateFunc)
 	if err != nil {
 		panic(err)
 	}
 
-	ctx := context.Background()
-	err = tokenDirectoryFetcher.Run(ctx)
-	if err != nil {
-		panic(err)
-	}
+	go func() {
+		err := tokenDirectory.Run(context.Background())
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	time.Sleep(time.Second * 60)
-	// stops the fetcher
-	ctx.Done()
+	tokenDirectory.Stop()
 }

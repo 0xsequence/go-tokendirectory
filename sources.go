@@ -2,9 +2,11 @@ package tokendirectory
 
 // Sources from github.com/0xsequence/token-directory and other token-list sources.
 
-// tokenDirectorySources, order of precedence is from top to bottom, meaning
+type Sources map[uint64][]string
+
+// DefaultSources tokenDirectorySources, order of precedence is from top to bottom, meaning
 // token info in lists higher up take precedence.
-var DefaultTokenDirectorySources = map[uint64][]string{
+var DefaultSources Sources = map[uint64][]string{
 	// mainnet
 	1: {
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc20.json",
