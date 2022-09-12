@@ -132,7 +132,7 @@ func (f *TokenDirectory) updateChainSource(ctx context.Context, chainID uint64) 
 	f.contractsMu.Unlock()
 
 	for _, source := range f.sources[chainID] {
-		tokenList, err := f.fetchTokenList(source)
+		tokenList, err := f.fetchTokenList(chainID, source)
 		if err != nil {
 			log.Warn().Err(err).Msgf("failed to fetch from source %q", source)
 			continue
@@ -183,7 +183,7 @@ func (f *TokenDirectory) updateChainSource(ctx context.Context, chainID uint64) 
 	}
 }
 
-func (f *TokenDirectory) fetchTokenList(source string) (*TokenList, error) {
+func (f *TokenDirectory) fetchTokenList(chainID uint64, source string) (*TokenList, error) {
 	log.Debug().Msgf("fetching tokens from source %q", source)
 
 	httpClient := http.DefaultClient
@@ -202,7 +202,16 @@ func (f *TokenDirectory) fetchTokenList(source string) (*TokenList, error) {
 
 	var list TokenList
 	if err := json.Unmarshal(buf, &list); err != nil {
-		return nil, fmt.Errorf("failed decoding JSON: %w", err)
+		// failed to decode, likely because it doesn't follow standard token-list format,
+		// and its just returning the ".tokens" part.
+		list = TokenList{Name: fmt.Sprintf("%d", chainID), ChainID: chainID}
+
+		tokens := list.Tokens
+		err = json.Unmarshal(buf, &tokens)
+		if err != nil {
+			return nil, fmt.Errorf("failed decoding JSON: %w", err)
+		}
+		list.Tokens = tokens
 	}
 
 	// normalize addresses

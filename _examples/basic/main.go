@@ -17,7 +17,7 @@ func main() {
 		}
 	}
 
-	tokenDirectory, err := tokendirectory.NewTokenDirectory(tokendirectory.DefaultSources, time.Second*30, updateFunc)
+	tokenDirectory, err := tokendirectory.NewTokenDirectory(tokendirectory.DefaultSources, time.Minute*1, updateFunc)
 	if err != nil {
 		panic(err)
 	}
@@ -29,6 +29,6 @@ func main() {
 		}
 	}()
 
-	time.Sleep(time.Second * 60)
+	time.Sleep(time.Second * 150)
 	tokenDirectory.Stop()
 }
