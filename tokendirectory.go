@@ -85,7 +85,7 @@ func (f *TokenDirectory) Run(ctx context.Context) error {
 	// Fetch on interval
 	for {
 		select {
-		case <-ctx.Done():
+		case <-f.ctx.Done():
 			return nil
 		case <-time.After(f.updateInterval):
 			f.updateSources(f.ctx)
