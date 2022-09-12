@@ -21,7 +21,7 @@ func NewTokenDirectory(sources Sources, updateInterval time.Duration, onUpdate .
 		// default update every 15 minutes
 		updateInterval = time.Minute * 15
 	}
-	if updateInterval > 1*time.Minute {
+	if updateInterval < 1*time.Minute {
 		return nil, fmt.Errorf("updateInterval must be greater then 1 minute")
 	}
 
