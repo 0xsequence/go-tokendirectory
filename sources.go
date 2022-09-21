@@ -13,8 +13,8 @@ var DefaultSources Sources = map[uint64][]string{
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc721.json",
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc1155.json",
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/misc.json",
-		"https://unpkg.com/@uniswap/default-token-list@2.0.0/build/uniswap-default.tokenlist.json",
-		"https://unpkg.com/@sushiswap/default-token-list@16.18.0/build/sushiswap-default.tokenlist.json",
+		"https://unpkg.com/@uniswap/default-token-list@4.1.0/build/uniswap-default.tokenlist.json",
+		"https://unpkg.com/@sushiswap/default-token-list@34.0.0/build/sushiswap-default.tokenlist.json",
 		"https://tokens.coingecko.com/uniswap/all.json",
 	},
 	// polygon
@@ -23,7 +23,7 @@ var DefaultSources Sources = map[uint64][]string{
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon/erc721.json",
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon/erc1155.json",
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon/misc.json",
-		"https://unpkg.com/@sushiswap/default-token-list@16.18.0/build/sushiswap-default.tokenlist.json",
+		"https://unpkg.com/@sushiswap/default-token-list@34.0.0/build/sushiswap-default.tokenlist.json",
 	},
 	// rinkeby
 	4: {
