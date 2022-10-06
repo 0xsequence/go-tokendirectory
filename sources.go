@@ -31,6 +31,13 @@ var DefaultSources Sources = map[uint64][]string{
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/rinkeby/erc1155.json",
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/rinkeby/misc.json",
 	},
+	// goerli
+	5: {
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/goerli/erc20.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/goerli/erc721.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/goerli/erc1155.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/goerli/misc.json",
+	},
 	// mumbai
 	80001: {
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mumbai/erc20.json",
