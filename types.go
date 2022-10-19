@@ -24,12 +24,13 @@ type ContractInfo struct {
 	Decimals   uint64 `json:"decimals"`
 	LogoURI    string `json:"logoURI,omitempty"`
 	Extensions struct {
-		Link          string `json:"link,omitempty"`
-		Description   string `json:"description,omitempty"`
-		OgImage       string `json:"ogImage,omitempty"`
-		OriginChainID uint64 `json:"originChainId,omitempty"`
-		OriginAddress string `json:"originAddress,omitempty"`
-		Blacklist     bool   `json:"blacklist,omitempty"`
+		Link                  string   `json:"link,omitempty"`
+		Description           string   `json:"description,omitempty"`
+		OgImage               string   `json:"ogImage,omitempty"`
+		OriginChainID         uint64   `json:"originChainId,omitempty"`
+		OriginAddress         string   `json:"originAddress,omitempty"`
+		Blacklist             bool     `json:"blacklist,omitempty"`
+		ContractABIExtensions []string `json:"contractABIExtensions,omitempty"`
 	} `json:"extensions"`
 	ContentHash uint64 `json:"-"`
 }
