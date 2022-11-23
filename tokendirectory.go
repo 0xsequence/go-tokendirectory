@@ -42,6 +42,7 @@ func NewTokenDirectory(sources Sources, updateInterval time.Duration, onUpdate .
 		sources:        sources,
 		lists:          lists,
 		contracts:      contracts,
+		httpClient:     http.DefaultClient,
 		updateInterval: updateInterval,
 		onUpdate:       updateFunc,
 	}
@@ -60,12 +61,19 @@ type TokenDirectory struct {
 	onUpdate       onUpdateFunc
 	updateMu       sync.Mutex
 
+	httpClient *http.Client
+
 	ctx     context.Context
 	ctxStop context.CancelFunc
 	running int32
 }
 
 type onUpdateFunc func(ctx context.Context, chainID uint64, contractInfoList []ContractInfo)
+
+// SetHttpClient sets the http client used to fetch token-lists from remote sources.
+func (f *TokenDirectory) SetHttpClient(client *http.Client) {
+	f.httpClient = client
+}
 
 // Run starts the token directory fetcher. This method will block and poll in the current
 // go-routine. You'll be responsible for calling the Run method in your own gorutine.
@@ -186,10 +194,8 @@ func (f *TokenDirectory) updateChainSource(ctx context.Context, chainID uint64) 
 func (f *TokenDirectory) fetchTokenList(chainID uint64, source string) (*TokenList, error) {
 	log.Debug().Msgf("fetching tokens from source %q", source)
 
-	httpClient := http.DefaultClient
-
 	// pull from URL
-	res, err := httpClient.Get(source)
+	res, err := f.httpClient.Get(source)
 	if err != nil {
 		return nil, fmt.Errorf("failed fetching from %s: %w", source, err)
 	}
