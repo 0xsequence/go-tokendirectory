@@ -50,6 +50,10 @@ var DefaultSources Sources = map[uint64][]string{
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/bnb/erc20.json",
 		"https://raw.githubusercontent.com/pancakeswap/pancake-toolkit/master/packages/token-lists/lists/pancakeswap-default.json",
 	},
+	// BSC-testnet
+	97: {
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/bnb-testnet/erc20.json",
+	},
 	// arbitrum
 	42161: {
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/arbitrum/erc20.json",
