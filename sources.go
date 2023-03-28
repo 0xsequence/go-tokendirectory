@@ -25,6 +25,13 @@ var DefaultSources Sources = map[uint64][]string{
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon/misc.json",
 		"https://unpkg.com/@sushiswap/default-token-list@34.0.0/build/sushiswap-default.tokenlist.json",
 	},
+	// polygon zkevm
+	1101: {
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon-zkevm/erc20.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon-zkevm/erc721.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon-zkevm/erc1155.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon-zkevm/misc.json",
+	},
 	// rinkeby
 	4: {
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/rinkeby/erc20.json",
