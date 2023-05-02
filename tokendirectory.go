@@ -249,10 +249,20 @@ func (f *TokenDirectory) GetContractInfo(ctx context.Context, chainId uint64, co
 
 func (f *TokenDirectory) GetAllTokens(ctx context.Context) ([]ContractInfo, error) {
 	var tokens []ContractInfo
-	for _, info := range f.lists {
-		for _, tokenList := range info {
-			tokens = append(tokens, tokenList.Tokens...)
+	for chainID := range f.lists {
+		list, err := f.GetTokens(ctx, chainID)
+		if err != nil {
+			return nil, err
 		}
+		tokens = append(tokens, list...)
+	}
+	return tokens, nil
+}
+
+func (f *TokenDirectory) GetTokens(ctx context.Context, chainID uint64) ([]ContractInfo, error) {
+	tokens := make([]ContractInfo, 0, len(f.lists[chainID]))
+	for _, list := range f.lists[chainID] {
+		tokens = append(tokens, list.Tokens...)
 	}
 	return tokens, nil
 }
