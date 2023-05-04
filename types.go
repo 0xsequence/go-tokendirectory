@@ -32,6 +32,7 @@ type ContractInfo struct {
 		Blacklist             bool     `json:"blacklist,omitempty"`
 		ContractABIExtensions []string `json:"contractABIExtensions,omitempty"`
 		Featured              bool     `json:"featured,omitempty"`
+		Mute                  bool     `json:"mute,omitempty"`
 	} `json:"extensions"`
 	ContentHash uint64 `json:"-"`
 }
