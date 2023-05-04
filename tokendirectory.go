@@ -225,6 +225,7 @@ func (f *TokenDirectory) fetchTokenList(chainID uint64, source string) (*TokenLi
 	for i, info := range list.Tokens {
 		info.Address = strings.ToLower(info.Address)
 		info.Extensions.OriginAddress = strings.ToLower(info.Extensions.OriginAddress)
+		info.Type = strings.ToUpper(list.TokenStandard)
 		tokenInfo[i] = info
 	}
 	list.Tokens = tokenInfo
