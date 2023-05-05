@@ -32,12 +32,6 @@ var DefaultSources Sources = map[uint64][]string{
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon-zkevm/erc1155.json",
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon-zkevm/misc.json",
 	},
-	// rinkeby
-	4: {
-		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/rinkeby/erc20.json",
-		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/rinkeby/erc1155.json",
-		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/rinkeby/misc.json",
-	},
 	// goerli
 	5: {
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/goerli/erc20.json",
