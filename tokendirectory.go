@@ -248,6 +248,21 @@ func (f *TokenDirectory) GetContractInfo(ctx context.Context, chainId uint64, co
 	return ContractInfo{}, false, errors.New("contract not found")
 }
 
+func (f *TokenDirectory) GetNetworks(ctx context.Context) ([]uint64, error) {
+	chainIDs := make([]uint64, 0, len(f.lists))
+	for chainID := range f.lists {
+		list, err := f.GetTokens(ctx, chainID)
+		if err != nil {
+			return nil, err
+		}
+		if len(list) == 0 {
+			continue
+		}
+		chainIDs = append(chainIDs, chainID)
+	}
+	return chainIDs, nil
+}
+
 func (f *TokenDirectory) GetAllTokens(ctx context.Context) ([]ContractInfo, error) {
 	var tokens []ContractInfo
 	for chainID := range f.lists {
