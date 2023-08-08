@@ -49,11 +49,17 @@ var DefaultSources Sources = map[uint64][]string{
 	// BSC
 	56: {
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/bnb/erc20.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/bnb/erc721.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/bnb/erc1155.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/bnb/misc.json",
 		"https://raw.githubusercontent.com/pancakeswap/pancake-toolkit/master/packages/token-lists/lists/pancakeswap-default.json",
 	},
 	// BSC-testnet
 	97: {
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/bnb-testnet/erc20.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/bnb-testnet/erc721.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/bnb-testnet/erc1155.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/bnb-testnet/misc.json",
 	},
 	// arbitrum
 	42161: {
@@ -87,6 +93,38 @@ var DefaultSources Sources = map[uint64][]string{
 	},
 	// gnosis
 	100: {
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/gnosis/erc20.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/gnosis/erc721.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/gnosis/erc1155.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/gnosis/misc.json",
 		"https://raw.githubusercontent.com/sushiswap/list/master/lists/token-lists/default-token-list/tokens/xdai.json",
+	},
+	// base
+	8453: {
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/base/erc20.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/base/erc721.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/base/erc1155.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/base/misc.json",
+	},
+	// base-goerli
+	84531: {
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/base-goerli/erc20.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/base-goerli/erc721.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/base-goerli/erc1155.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/base-goerli/misc.json",
+	},
+	// sepolia
+	11155111: {
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/erc20.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/erc721.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/erc1155.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/misc.json",
+	},
+	// homeverse-testnet
+	40875: {
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/homeverse-testnet/erc20.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/homeverse-testnet/erc721.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/homeverse-testnet/erc1155.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/homeverse-testnet/misc.json",
 	},
 }
