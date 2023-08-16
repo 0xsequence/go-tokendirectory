@@ -120,6 +120,13 @@ var DefaultSources Sources = map[uint64][]string{
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/erc1155.json",
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/misc.json",
 	},
+	// homeverse
+	19011: {
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/homeverse/erc20.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/homeverse/erc721.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/homeverse/erc1155.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/homeverse/misc.json",
+	},
 	// homeverse-testnet
 	40875: {
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/homeverse-testnet/erc20.json",
