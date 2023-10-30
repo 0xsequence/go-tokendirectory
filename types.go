@@ -33,6 +33,8 @@ type ContractInfo struct {
 		ContractABIExtensions []string `json:"contractABIExtensions,omitempty"`
 		Featured              bool     `json:"featured,omitempty"`
 		Mute                  bool     `json:"mute,omitempty"`
+		Verified              bool     `json:"verified"`
+		VerifiedBy            *string  `json:"verifiedBy"`
 	} `json:"extensions"`
 	ContentHash uint64 `json:"-"`
 }

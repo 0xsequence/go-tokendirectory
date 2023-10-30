@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -201,7 +201,7 @@ func (f *TokenDirectory) fetchTokenList(chainID uint64, source string) (*TokenLi
 	}
 	defer res.Body.Close()
 
-	buf, err := ioutil.ReadAll(res.Body)
+	buf, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed reading body: %w", err)
 	}
@@ -226,6 +226,10 @@ func (f *TokenDirectory) fetchTokenList(chainID uint64, source string) (*TokenLi
 		info.Address = strings.ToLower(info.Address)
 		info.Extensions.OriginAddress = strings.ToLower(info.Extensions.OriginAddress)
 		info.Type = strings.ToUpper(list.TokenStandard)
+		// add the token-directory verification stamp
+		info.Extensions.Verified = !info.Extensions.Blacklist
+		verifiedBy := "token-directory"
+		info.Extensions.VerifiedBy = &verifiedBy
 		tokenInfo[i] = info
 	}
 	list.Tokens = tokenInfo
