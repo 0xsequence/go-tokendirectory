@@ -34,7 +34,7 @@ type ContractInfo struct {
 		Featured              bool     `json:"featured,omitempty"`
 		Mute                  bool     `json:"mute,omitempty"`
 		Verified              bool     `json:"verified"`
-		VerifiedBy            *string  `json:"verifiedBy"`
+		VerifiedBy            string   `json:"verifiedBy,omitempty"`
 	} `json:"extensions"`
 	ContentHash uint64 `json:"-"`
 }

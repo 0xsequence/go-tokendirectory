@@ -228,8 +228,7 @@ func (f *TokenDirectory) fetchTokenList(chainID uint64, source string) (*TokenLi
 		info.Type = strings.ToUpper(list.TokenStandard)
 		// add the token-directory verification stamp
 		info.Extensions.Verified = !info.Extensions.Blacklist
-		verifiedBy := "token-directory"
-		info.Extensions.VerifiedBy = &verifiedBy
+		info.Extensions.VerifiedBy = "token-directory"
 		tokenInfo[i] = info
 	}
 	list.Tokens = tokenInfo
