@@ -131,6 +131,8 @@ func (f *TokenDirectory) updateChainSource(ctx context.Context, chainID uint64) 
 	f.updateMu.Lock()
 	defer f.updateMu.Unlock()
 
+	// TODO: in future we can check builder-api dynamicly for the chainId
+
 	updatedContractInfo := []ContractInfo{}
 	seen := map[string]bool{}
 
