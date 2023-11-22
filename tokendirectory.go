@@ -75,6 +75,10 @@ func (f *TokenDirectory) SetHttpClient(client *http.Client) {
 	f.httpClient = client
 }
 
+func (f *TokenDirectory) SetOnUpdateFunc(onUpdate onUpdateFunc) {
+	f.onUpdate = onUpdate
+}
+
 // Run starts the token directory fetcher. This method will block and poll in the current
 // go-routine. You'll be responsible for calling the Run method in your own gorutine.
 func (f *TokenDirectory) Run(ctx context.Context) error {
@@ -126,6 +130,8 @@ func (f *TokenDirectory) updateSources(ctx context.Context) error {
 func (f *TokenDirectory) updateChainSource(ctx context.Context, chainID uint64) {
 	f.updateMu.Lock()
 	defer f.updateMu.Unlock()
+
+	// TODO: in future we can check builder-api dynamicly for the chainId
 
 	updatedContractInfo := []ContractInfo{}
 	seen := map[string]bool{}
