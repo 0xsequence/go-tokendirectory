@@ -75,6 +75,10 @@ func (f *TokenDirectory) SetHttpClient(client *http.Client) {
 	f.httpClient = client
 }
 
+func (f *TokenDirectory) SetOnUpdateFunc(onUpdate onUpdateFunc) {
+	f.onUpdate = onUpdate
+}
+
 // Run starts the token directory fetcher. This method will block and poll in the current
 // go-routine. You'll be responsible for calling the Run method in your own gorutine.
 func (f *TokenDirectory) Run(ctx context.Context) error {

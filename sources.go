@@ -9,6 +9,77 @@ type Sources map[uint64][]string
 var DefaultSources Sources = map[uint64][]string{
 	// mainnet
 	1: {
+		"https://api.sequence.build/token-directory/mainnet",
+	},
+	// polygon
+	137: {
+		"https://api.sequence.build/token-directory/polygon",
+	},
+	// polygon zkevm
+	1101: {
+		"https://api.sequence.build/token-directory/polygon-zkevm",
+	},
+	// goerli
+	5: {
+		"https://api.sequence.build/token-directory/goerli",
+	},
+	// mumbai
+	80001: {
+		"https://api.sequence.build/token-directory/mumbai",
+	},
+	// BSC
+	56: {
+		"https://api.sequence.build/token-directory/bnb",
+	},
+	// BSC-testnet
+	97: {
+		"https://api.sequence.build/token-directory/bnb-testnet",
+	},
+	// arbitrum
+	42161: {
+		"https://api.sequence.build/token-directory/arbitrum",
+	},
+	// arbitrum-nova
+	42170: {
+		"https://api.sequence.build/token-directory/arbitrum-nova",
+	},
+	// avalanche
+	43114: {
+		"https://api.sequence.build/token-directory/avalanche",
+	},
+	// optimism
+	10: {
+		"https://api.sequence.build/token-directory/optimism",
+	},
+	// gnosis
+	100: {
+		"https://api.sequence.build/token-directory/gnosis",
+	},
+	// base
+	8453: {
+		"https://api.sequence.build/token-directory/base",
+	},
+	// base-goerli
+	84531: {
+		"https://api.sequence.build/token-directory/base-goerli",
+	},
+	// sepolia
+	11155111: {
+		"https://api.sequence.build/token-directory/sepolia",
+	},
+	// homeverse
+	19011: {
+		"https://api.sequence.build/token-directory/homeverse",
+	},
+	// homeverse-testnet
+	40875: {
+		"https://api.sequence.build/token-directory/homeverse-testnet",
+	},
+}
+
+var RawSources Sources = map[uint64][]string{
+	// mainnet
+	1: {
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc20.json",
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc721.json",
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc1155.json",
