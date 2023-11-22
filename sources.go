@@ -4,6 +4,8 @@ package tokendirectory
 
 type Sources map[uint64][]string
 
+const builderSourceHost = "https://api.sequence.build"
+
 // DefaultSources tokenDirectorySources, order of precedence is from top to bottom, meaning
 // token info in lists higher up take precedence. Listed in alphabetical order by chain name.
 var DefaultSources Sources = map[uint64][]string{

@@ -31,7 +31,7 @@ type ContractInfo struct {
 		OriginAddress         string   `json:"originAddress,omitempty"`
 		Blacklist             bool     `json:"blacklist,omitempty"`
 		ContractABIExtensions []string `json:"contractABIExtensions,omitempty"`
-		Featured              int64    `json:"featured,omitempty"`
+		Featured              int32    `json:"featured,omitempty"`
 		Mute                  bool     `json:"mute,omitempty"`
 		Verified              bool     `json:"verified"`
 		VerifiedBy            string   `json:"verifiedBy,omitempty"`
