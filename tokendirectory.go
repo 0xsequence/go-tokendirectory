@@ -16,7 +16,21 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func NewTokenDirectory(sources Sources, updateInterval time.Duration, onUpdate ...onUpdateFunc) (*TokenDirectory, error) {
+type Options struct {
+	// OnUpdate hook whenever token-directory updates the list
+	OnUpdate OnUpdateFunc
+
+	// SkipBuilderSources using the default `builderSourceHost` host
+	SkipBuilderSources bool
+
+	// ExtraSources which will be added to top of the list of sources
+	ExtraSources Sources
+
+	// ChainIDs to include directory for only specific networks
+	ChainIDs []uint64
+}
+
+func NewTokenDirectory(sources Sources, updateInterval time.Duration, options ...Options) (*TokenDirectory, error) {
 	if updateInterval == 0 {
 		// default update every 15 minutes
 		updateInterval = time.Minute * 15
@@ -25,11 +39,27 @@ func NewTokenDirectory(sources Sources, updateInterval time.Duration, onUpdate .
 		return nil, fmt.Errorf("updateInterval must be greater then 1 minute")
 	}
 
-	var updateFunc onUpdateFunc
-	if len(onUpdate) > 0 {
-		updateFunc = onUpdate[0]
+	var opts Options
+	if len(options) > 0 {
+		opts = options[0]
 	}
 
+	// optionally skip builder sources
+	if opts.SkipBuilderSources {
+		sources = sources.SkipSourcePrefix(builderSourceHost)
+	}
+
+	// optionally add extra sources
+	if len(opts.ExtraSources) > 0 {
+		sources = sources.AddSources(opts.ExtraSources)
+	}
+
+	// optionally only include specific networks
+	if len(opts.ChainIDs) > 0 {
+		sources = sources.ByChainIDs(opts.ChainIDs)
+	}
+
+	// build internal structures
 	lists := make(map[uint64]map[string]*TokenList)
 	contracts := make(map[uint64]map[prototyp.Hash]ContractInfo)
 
@@ -44,7 +74,7 @@ func NewTokenDirectory(sources Sources, updateInterval time.Duration, onUpdate .
 		contracts:      contracts,
 		httpClient:     http.DefaultClient,
 		updateInterval: updateInterval,
-		onUpdate:       updateFunc,
+		onUpdate:       opts.OnUpdate,
 	}
 
 	return f, nil
@@ -58,7 +88,7 @@ type TokenDirectory struct {
 	contractsMu sync.RWMutex
 
 	updateInterval time.Duration
-	onUpdate       onUpdateFunc
+	onUpdate       OnUpdateFunc
 	updateMu       sync.Mutex
 
 	httpClient *http.Client
@@ -68,14 +98,14 @@ type TokenDirectory struct {
 	running int32
 }
 
-type onUpdateFunc func(ctx context.Context, chainID uint64, contractInfoList []ContractInfo)
+type OnUpdateFunc func(ctx context.Context, chainID uint64, contractInfoList []ContractInfo)
 
 // SetHttpClient sets the http client used to fetch token-lists from remote sources.
 func (f *TokenDirectory) SetHttpClient(client *http.Client) {
 	f.httpClient = client
 }
 
-func (f *TokenDirectory) SetOnUpdateFunc(onUpdate onUpdateFunc) {
+func (f *TokenDirectory) SetOnUpdateFunc(onUpdate OnUpdateFunc) {
 	f.onUpdate = onUpdate
 }
 

@@ -1,7 +1,8 @@
 package tokendirectory
 
-// Sources from github.com/0xsequence/token-directory and other token-list sources.
+import "strings"
 
+// Sources from github.com/0xsequence/token-directory and other token-list sources.
 type Sources map[uint64][]string
 
 const builderSourceHost = "https://api.sequence.build"
@@ -210,4 +211,37 @@ var DefaultSources Sources = map[uint64][]string{
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/erc1155.json",
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/misc.json",
 	},
+}
+
+func (s Sources) SkipSourcePrefix(baseURL string) Sources {
+	out := make(Sources, len(s))
+	for chainID, sourceList := range s {
+		list := make([]string, 0, len(sourceList))
+		for _, src := range sourceList {
+			if strings.HasPrefix(src, baseURL) {
+				continue
+			}
+			list = append(list, src)
+		}
+		if len(list) == 0 {
+			continue
+		}
+		out[chainID] = list
+	}
+	return out
+}
+
+func (s Sources) ByChainIDs(chainIDs []uint64) Sources {
+	out := make(Sources, len(chainIDs))
+	for _, chainID := range chainIDs {
+		if sources, ok := s[chainID]; ok {
+			out[chainID] = sources
+		}
+	}
+	return out
+}
+
+func (s Sources) AddSources(extra Sources) Sources {
+	// TODO
+	return s
 }
