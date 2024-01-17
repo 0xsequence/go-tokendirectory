@@ -113,13 +113,6 @@ var DefaultSources Sources = map[uint64][]string{
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/base-goerli/erc1155.json",
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/base-goerli/misc.json",
 	},
-	// sepolia
-	11155111: {
-		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/erc20.json",
-		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/erc721.json",
-		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/erc1155.json",
-		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/misc.json",
-	},
 	// homeverse
 	19011: {
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/homeverse/erc20.json",
@@ -133,5 +126,33 @@ var DefaultSources Sources = map[uint64][]string{
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/homeverse-testnet/erc721.json",
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/homeverse-testnet/erc1155.json",
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/homeverse-testnet/misc.json",
+	},
+	// sepolia
+	11155111: {
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/erc20.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/erc721.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/erc1155.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/sepolia/misc.json",
+	},
+	// base-sepolia
+	84532: {
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/base-sepolia/erc20.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/base-sepolia/erc721.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/base-sepolia/erc1155.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/base-sepolia/misc.json",
+	},
+	// arbitrum-sepolia
+	421614: {
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/arbitrum-sepolia/erc20.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/arbitrum-sepolia/erc721.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/arbitrum-sepolia/erc1155.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/arbitrum-sepolia/misc.json",
+	},
+	// optimism-sepolia
+	11155420: {
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/optimism-sepolia/erc20.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/optimism-sepolia/erc721.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/optimism-sepolia/erc1155.json",
+		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/optimism-sepolia/misc.json",
 	},
 }
