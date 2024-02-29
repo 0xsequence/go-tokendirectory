@@ -16,49 +16,49 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func NewTokenDirectory(sources Sources, updateInterval time.Duration, onUpdate ...onUpdateFunc) (*TokenDirectory, error) {
-	if updateInterval == 0 {
-		// default update every 15 minutes
-		updateInterval = time.Minute * 15
-	}
-	if updateInterval < 1*time.Minute {
-		return nil, fmt.Errorf("updateInterval must be greater then 1 minute")
+func NewTokenDirectory(options ...Option) (*TokenDirectory, error) {
+	dir := &TokenDirectory{
+		lists:     make(map[uint64]map[string]*TokenList),
+		contracts: make(map[uint64]map[prototyp.Hash]ContractInfo),
 	}
 
-	var updateFunc onUpdateFunc
-	if len(onUpdate) > 0 {
-		updateFunc = onUpdate[0]
+	for _, option := range options {
+		if err := option(dir); err != nil {
+			return nil, err
+		}
 	}
 
-	lists := make(map[uint64]map[string]*TokenList)
-	contracts := make(map[uint64]map[prototyp.Hash]ContractInfo)
-
-	for chainId, _ := range sources {
-		lists[chainId] = make(map[string]*TokenList)
-		contracts[chainId] = make(map[prototyp.Hash]ContractInfo)
+	// set defaults
+	if dir.httpClient == nil {
+		dir.httpClient = http.DefaultClient
+	}
+	if dir.updateInterval == 0 {
+		dir.updateInterval = time.Minute * 15
+	}
+	if len(dir.sources) == 0 {
+		dir.sources = append(dir.sources, DefaultSources)
 	}
 
-	f := &TokenDirectory{
-		sources:        sources,
-		lists:          lists,
-		contracts:      contracts,
-		httpClient:     http.DefaultClient,
-		updateInterval: updateInterval,
-		onUpdate:       updateFunc,
+	// initialize the token lists
+	for _, source := range dir.sources {
+		for _, chainId := range source.GetChainIDs() {
+			dir.lists[chainId] = make(map[string]*TokenList)
+			dir.contracts[chainId] = make(map[prototyp.Hash]ContractInfo)
+		}
 	}
 
-	return f, nil
+	return dir, nil
 }
 
 type TokenDirectory struct {
-	sources Sources
+	sources []Source
 	lists   map[uint64]map[string]*TokenList
 
 	contracts   map[uint64]map[prototyp.Hash]ContractInfo
 	contractsMu sync.RWMutex
 
 	updateInterval time.Duration
-	onUpdate       onUpdateFunc
+	onUpdate       []OnUpdateFunc
 	updateMu       sync.Mutex
 
 	httpClient *http.Client
@@ -68,7 +68,7 @@ type TokenDirectory struct {
 	running int32
 }
 
-type onUpdateFunc func(ctx context.Context, chainID uint64, contractInfoList []ContractInfo)
+type OnUpdateFunc func(ctx context.Context, chainID uint64, contractInfoList []ContractInfo)
 
 // SetHttpClient sets the http client used to fetch token-lists from remote sources.
 func (f *TokenDirectory) SetHttpClient(client *http.Client) {
@@ -112,18 +112,20 @@ func (f *TokenDirectory) IsRunning() bool {
 
 func (f *TokenDirectory) updateSources(ctx context.Context) error {
 	wg := &sync.WaitGroup{}
-	for chainID := range f.sources {
-		wg.Add(1)
-		go func(chainID uint64) {
-			defer wg.Done()
-			f.updateChainSource(ctx, chainID)
-		}(chainID)
+	for _, source := range f.sources {
+		for _, chainID := range source.GetChainIDs() {
+			wg.Add(1)
+			go func(chainID uint64) {
+				defer wg.Done()
+				f.updateChainSource(ctx, source, chainID)
+			}(chainID)
+		}
 	}
 	wg.Wait()
 	return nil
 }
 
-func (f *TokenDirectory) updateChainSource(ctx context.Context, chainID uint64) {
+func (f *TokenDirectory) updateChainSource(ctx context.Context, source Source, chainID uint64) {
 	f.updateMu.Lock()
 	defer f.updateMu.Unlock()
 
@@ -139,7 +141,7 @@ func (f *TokenDirectory) updateChainSource(ctx context.Context, chainID uint64) 
 	}
 	f.contractsMu.Unlock()
 
-	for _, source := range f.sources[chainID] {
+	for _, source := range source.GetURLs(chainID) {
 		tokenList, err := f.fetchTokenList(chainID, source)
 		if err != nil {
 			log.Warn().Err(err).Msgf("failed to fetch from source %q", source)
@@ -186,7 +188,9 @@ func (f *TokenDirectory) updateChainSource(ctx context.Context, chainID uint64) 
 
 	if f.onUpdate != nil {
 		if len(updatedContractInfo) > 0 {
-			go f.onUpdate(ctx, chainID, updatedContractInfo)
+			for i := range f.onUpdate {
+				go f.onUpdate[i](ctx, chainID, updatedContractInfo)
+			}
 		}
 	}
 }

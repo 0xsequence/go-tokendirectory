@@ -1,12 +1,39 @@
 package tokendirectory
 
-// Sources from github.com/0xsequence/token-directory and other token-list sources.
+import (
+	"slices"
+)
 
-type Sources map[uint64][]string
+// Source from github.com/0xsequence/token-directory and other token-list sources.
+type Source interface {
+	GetID() string
+	GetChainIDs() []uint64
+	GetURLs(chainID uint64) []string
+}
+
+type StaticSource map[uint64][]string
+
+func (s StaticSource) GetID() string {
+	return "static"
+
+}
+
+func (s StaticSource) GetChainIDs() []uint64 {
+	chainIDs := make([]uint64, 0, len(s))
+	for chainID := range s {
+		chainIDs = append(chainIDs, chainID)
+	}
+	slices.Sort(chainIDs)
+	return chainIDs
+}
+
+func (s StaticSource) GetURLs(chainID uint64) []string {
+	return s[chainID]
+}
 
 // DefaultSources tokenDirectorySources, order of precedence is from top to bottom, meaning
 // token info in lists higher up take precedence.
-var DefaultSources Sources = map[uint64][]string{
+var DefaultSources Source = StaticSource{
 	// mainnet
 	1: {
 		"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc20.json",

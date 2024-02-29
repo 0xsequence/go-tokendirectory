@@ -17,7 +17,12 @@ func main() {
 		}
 	}
 
-	tokenDirectory, err := tokendirectory.NewTokenDirectory(tokendirectory.DefaultSources, time.Minute*1, updateFunc)
+	options := []tokendirectory.Option{
+		tokendirectory.WithUpdateFuncs(updateFunc),
+		tokendirectory.WithUpdateInterval(time.Minute),
+	}
+
+	tokenDirectory, err := tokendirectory.NewTokenDirectory(options...)
 	if err != nil {
 		panic(err)
 	}
