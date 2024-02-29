@@ -115,10 +115,10 @@ func (f *TokenDirectory) updateSources(ctx context.Context) error {
 	for _, source := range f.sources {
 		for _, chainID := range source.GetChainIDs() {
 			wg.Add(1)
-			go func(chainID uint64) {
+			go func(chainID uint64, source Source) {
 				defer wg.Done()
 				f.updateChainSource(ctx, source, chainID)
-			}(chainID)
+			}(chainID, source)
 		}
 	}
 	wg.Wait()
