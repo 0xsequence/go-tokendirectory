@@ -256,7 +256,7 @@ func normalizeTokens(provider Provider, tokenList *TokenList) {
 		tokenList.Tokens[i].Address = strings.ToLower(info.Address)
 		tokenList.Tokens[i].Extensions.OriginAddress = strings.ToLower(info.Extensions.OriginAddress)
 		tokenList.Tokens[i].Type = strings.ToUpper(tokenList.TokenStandard)
-		// add the token-directory verification stamp
+		// add the provider verification stamp
 		tokenList.Tokens[i].Extensions.Verified = !info.Extensions.Blacklist
 		tokenList.Tokens[i].Extensions.VerifiedBy = provider.GetID()
 	}
