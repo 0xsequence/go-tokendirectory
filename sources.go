@@ -15,7 +15,6 @@ type StaticSource map[uint64][]string
 
 func (s StaticSource) GetID() string {
 	return "static"
-
 }
 
 func (s StaticSource) GetChainIDs() []uint64 {

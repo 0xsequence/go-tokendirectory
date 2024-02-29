@@ -18,7 +18,7 @@ type ContractInfo struct {
 	ChainID uint64 `json:"chainId"`
 	Address string `json:"address"`
 	Name    string `json:"name"`
-	//Standard   string `json:"standard"`
+	// Standard   string `json:"standard"`
 	Type       string `json:"type"` // NOTE: a duplicate of standard to normalize with other Sequence payloads
 	Symbol     string `json:"symbol,omitempty"`
 	Decimals   uint64 `json:"decimals"`
