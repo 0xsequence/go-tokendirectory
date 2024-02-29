@@ -19,11 +19,11 @@ func main() {
 	updateFunc := func(ctx context.Context, chainID uint64, list []tokendirectory.ContractInfo) {
 		logger := logger.With(slog.Uint64("chainID", chainID))
 		for _, c := range list {
-			logger.With(slog.String("address", c.Address), slog.String("name", c.Name)).Info("updated contract info")
+			logger.With(slog.String("address", c.Address), slog.String("name", c.Name)).Info("updated info")
 		}
 	}
 
-	logger.Info("go-tokendirectory example starting..")
+	logger.Info("go-tokendirectory example starting...")
 
 	options := []tokendirectory.Option{
 		tokendirectory.WithUpdateFuncs(updateFunc),

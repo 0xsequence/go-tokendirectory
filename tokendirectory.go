@@ -155,6 +155,7 @@ func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, 
 		logger.With(slog.Any("err", err)).Error("failed to fetch token list")
 		return
 	}
+	normalizeTokens(provider, tokenList)
 
 	t.lists[chainID][providerID] = tokenList
 
@@ -247,4 +248,16 @@ func (t *TokenDirectory) GetTokens(ctx context.Context, chainID uint64) ([]Contr
 		tokens = append(tokens, list.Tokens...)
 	}
 	return tokens, nil
+}
+
+func normalizeTokens(provider Provider, tokenList *TokenList) {
+	// normalize addresses
+	for i, info := range tokenList.Tokens {
+		tokenList.Tokens[i].Address = strings.ToLower(info.Address)
+		tokenList.Tokens[i].Extensions.OriginAddress = strings.ToLower(info.Extensions.OriginAddress)
+		tokenList.Tokens[i].Type = strings.ToUpper(tokenList.TokenStandard)
+		// add the token-directory verification stamp
+		tokenList.Tokens[i].Extensions.Verified = !info.Extensions.Blacklist
+		tokenList.Tokens[i].Extensions.VerifiedBy = provider.GetID()
+	}
 }

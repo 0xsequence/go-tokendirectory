@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"slices"
-	"strings"
 )
 
 // Provider is a source of tokens, organized by chainID and sourceName.
@@ -47,17 +46,17 @@ func (defaultProvider) GetSources(chainID uint64) []string {
 func (p defaultProvider) FetchTokenList(ctx context.Context, chainID uint64, sourceName string) (*TokenList, error) {
 	req, err := http.NewRequest("GET", defaultSources[chainID][sourceName], nil)
 	if err != nil {
-		return nil, fmt.Errorf("%v-%s creating request: %w", chainID, sourceName, err)
+		return nil, fmt.Errorf("creating request: %w", err)
 	}
 	res, err := p.client.Do(req.WithContext(ctx))
 	if err != nil {
-		return nil, fmt.Errorf("%v-%s fetching: %w", chainID, sourceName, err)
+		return nil, fmt.Errorf("fetching: %w", err)
 	}
 	defer res.Body.Close()
 
 	buf, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("%v-%s reading: %w", chainID, sourceName, err)
+		return nil, fmt.Errorf("reading body: %w", err)
 	}
 
 	var list TokenList
@@ -69,23 +68,10 @@ func (p defaultProvider) FetchTokenList(ctx context.Context, chainID uint64, sou
 		tokens := list.Tokens
 		err = json.Unmarshal(buf, &tokens)
 		if err != nil {
-			return nil, fmt.Errorf("%v-%s deconding: %w", chainID, sourceName, err)
+			return nil, fmt.Errorf("decoding json: %w", err)
 		}
 		list.Tokens = tokens
 	}
-
-	// normalize addresses
-	tokenInfo := make([]ContractInfo, len(list.Tokens))
-	for i, info := range list.Tokens {
-		info.Address = strings.ToLower(info.Address)
-		info.Extensions.OriginAddress = strings.ToLower(info.Extensions.OriginAddress)
-		info.Type = strings.ToUpper(list.TokenStandard)
-		// add the token-directory verification stamp
-		info.Extensions.Verified = !info.Extensions.Blacklist
-		info.Extensions.VerifiedBy = p.GetID()
-		tokenInfo[i] = info
-	}
-	list.Tokens = tokenInfo
 
 	return &list, nil
 }
