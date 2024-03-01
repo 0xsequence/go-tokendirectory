@@ -165,8 +165,7 @@ func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, 
 
 	t.lists[chainID][provider.GetID()] = tokenList
 
-	for i := range tokenList.Tokens {
-		contractInfo := tokenList.Tokens[i]
+	for _, token := range tokenList.Tokens {
 
 		if contractInfo.Name == "" || contractInfo.Address == "" {
 			continue
