@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -28,9 +27,6 @@ func NewTokenDirectory(options ...Option) (*TokenDirectory, error) {
 		}
 	}
 
-	if dir.log == nil {
-		dir.log = slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
-	}
 	if dir.httpClient == nil {
 		dir.httpClient = http.DefaultClient
 	}
