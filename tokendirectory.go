@@ -166,34 +166,33 @@ func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, 
 	t.lists[chainID][provider.GetID()] = tokenList
 
 	for _, token := range tokenList.Tokens {
-
-		if contractInfo.Name == "" || contractInfo.Address == "" {
+		if token.Name == "" || token.Address == "" {
 			continue
 		}
-		if contractInfo.ChainID != chainID {
+		if token.ChainID != chainID {
 			continue
 		}
 
-		if contractInfo.Type == "" {
-			contractInfo.Type = strings.ToUpper(tokenList.TokenStandard)
+		if token.Type == "" {
+			token.Type = strings.ToUpper(tokenList.TokenStandard)
 		}
 
-		contractInfo.Address = strings.ToLower(contractInfo.Address)
+		token.Address = strings.ToLower(token.Address)
 
-		if _, ok := seen[contractInfo.Address]; ok {
+		if _, ok := seen[token.Address]; ok {
 			// do not overwrite tokens that belong to a previous list
 			continue
 		}
 
 		// keep track of contract info which has been updated
 		if t.onUpdate != nil {
-			updatedContractInfo = append(updatedContractInfo, contractInfo)
+			updatedContractInfo = append(updatedContractInfo, token)
 		}
 
 		t.contractsMu.Lock()
-		t.contracts[chainID][prototyp.HashFromString(contractInfo.Address)] = contractInfo
+		t.contracts[chainID][prototyp.HashFromString(token.Address)] = token
 		t.contractsMu.Unlock()
-		seen[contractInfo.Address] = struct{}{}
+		seen[token.Address] = struct{}{}
 	}
 
 	if t.onUpdate != nil {
