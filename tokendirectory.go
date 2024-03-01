@@ -132,7 +132,7 @@ func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, 
 	defer t.updateMu.Unlock()
 
 	updatedContractInfo := []ContractInfo{}
-	seen := map[string]bool{}
+	seen := map[string]struct{}{}
 
 	t.contractsMu.Lock()
 	if _, ok := t.lists[chainID]; !ok {
@@ -177,7 +177,7 @@ func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, 
 
 		contractInfo.Address = strings.ToLower(contractInfo.Address)
 
-		if seen[contractInfo.Address] {
+		if _, ok := seen[contractInfo.Address]; ok {
 			// do not overwrite tokens that belong to a previous list
 			continue
 		}
@@ -190,7 +190,7 @@ func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, 
 		t.contractsMu.Lock()
 		t.contracts[chainID][prototyp.HashFromString(contractInfo.Address)] = contractInfo
 		t.contractsMu.Unlock()
-		seen[contractInfo.Address] = true
+		seen[contractInfo.Address] = struct{}{}
 	}
 
 	if t.onUpdate != nil {
