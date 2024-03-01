@@ -54,6 +54,10 @@ func (p defaultProvider) FetchTokenList(ctx context.Context, chainID uint64, sou
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetching: %s", res.Status)
+	}
+
 	buf, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading body: %w", err)

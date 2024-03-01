@@ -14,7 +14,13 @@ import (
 var debug = flag.Bool("debug", false, "enable debug logging")
 
 func main() {
-	logger := slog.New(tint.NewHandler(os.Stderr, &tint.Options{Level: slog.LevelDebug}))
+	flag.Parse()
+
+	level := slog.LevelInfo
+	if *debug {
+		level = slog.LevelDebug
+	}
+	logger := slog.New(tint.NewHandler(os.Stderr, &tint.Options{Level: level}))
 
 	updateFunc := func(ctx context.Context, chainID uint64, list []tokendirectory.ContractInfo) {
 		logger := logger.With(slog.Uint64("chainID", chainID))
@@ -28,9 +34,7 @@ func main() {
 	options := []tokendirectory.Option{
 		tokendirectory.WithUpdateFuncs(updateFunc),
 		tokendirectory.WithUpdateInterval(time.Minute),
-	}
-	if *debug {
-		options = append(options, tokendirectory.WithLogger(logger))
+		tokendirectory.WithLogger(logger),
 	}
 
 	tokenDirectory, err := tokendirectory.NewTokenDirectory(options...)

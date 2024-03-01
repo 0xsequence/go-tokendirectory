@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/0xsequence/go-sequence/lib/prototyp"
-	"github.com/rs/zerolog/log"
 )
 
 func NewTokenDirectory(options ...Option) (*TokenDirectory, error) {
@@ -102,7 +101,7 @@ func (t *TokenDirectory) Run(ctx context.Context) error {
 }
 
 func (t *TokenDirectory) Stop() {
-	log.Info().Msgf("tokendirectory: stop")
+	t.log.Info("tokendirectory: stop")
 	t.ctxStop()
 }
 
@@ -129,7 +128,22 @@ func (t *TokenDirectory) updateSources(ctx context.Context) error {
 
 func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, chainID uint64, source string) {
 	t.updateMu.Lock()
-	defer t.updateMu.Unlock()
+	var err error
+	defer func() {
+		t.updateMu.Unlock()
+		if t.log != nil {
+			logger := t.log.With(
+				slog.String("provider", provider.GetID()),
+				slog.Uint64("chainId", chainID),
+				slog.String("source", source),
+			)
+			if err != nil {
+				logger.Error("failed to update provider", slog.Any("err", err))
+				return
+			}
+			logger.Debug("updated provider")
+		}
+	}()
 
 	updatedContractInfo := []ContractInfo{}
 	seen := map[string]struct{}{}
@@ -143,23 +157,13 @@ func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, 
 	}
 	t.contractsMu.Unlock()
 
-	providerID := provider.GetID()
-
-	logger := t.log.With(
-		slog.String("providerID", providerID),
-		slog.Uint64("chainID", chainID),
-		slog.String("source", source),
-	)
-
-	logger.Debug("fetching token list")
 	tokenList, err := provider.FetchTokenList(ctx, chainID, source)
 	if err != nil {
-		logger.With(slog.Any("err", err)).Error("failed to fetch token list")
 		return
 	}
 	normalizeTokens(provider, tokenList)
 
-	t.lists[chainID][providerID] = tokenList
+	t.lists[chainID][provider.GetID()] = tokenList
 
 	for i := range tokenList.Tokens {
 		contractInfo := tokenList.Tokens[i]
