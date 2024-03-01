@@ -25,7 +25,15 @@ func WithLogger(logger *slog.Logger) Option {
 
 func WithProviders(providers ...Provider) Option {
 	return func(td *TokenDirectory) error {
-		td.providers = providers
+		if len(providers) == 0 {
+			return fmt.Errorf("no provider specified")
+		}
+		for _, p := range providers {
+			if _, ok := td.providers[p.GetID()]; ok {
+				return fmt.Errorf("provider %q already exists", p.GetID())
+			}
+			td.providers[p.GetID()] = p
+		}
 		return nil
 	}
 }

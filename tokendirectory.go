@@ -18,6 +18,7 @@ import (
 
 func NewTokenDirectory(options ...Option) (*TokenDirectory, error) {
 	dir := &TokenDirectory{
+		providers: make(map[string]Provider),
 		lists:     make(map[uint64]map[string]*TokenList),
 		contracts: make(map[uint64]map[prototyp.Hash]ContractInfo),
 	}
@@ -38,7 +39,8 @@ func NewTokenDirectory(options ...Option) (*TokenDirectory, error) {
 		dir.updateInterval = time.Minute * 15
 	}
 	if len(dir.providers) == 0 {
-		dir.providers = append(dir.providers, &defaultProvider{client: dir.httpClient})
+		p := &defaultProvider{client: dir.httpClient}
+		dir.providers = map[string]Provider{p.GetID(): p}
 	}
 
 	// initialize the token lists
@@ -54,7 +56,7 @@ func NewTokenDirectory(options ...Option) (*TokenDirectory, error) {
 
 type TokenDirectory struct {
 	log       *slog.Logger
-	providers []Provider
+	providers map[string]Provider
 	lists     map[uint64]map[string]*TokenList
 
 	contracts   map[uint64]map[prototyp.Hash]ContractInfo
