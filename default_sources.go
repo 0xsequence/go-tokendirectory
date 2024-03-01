@@ -40,13 +40,6 @@ var defaultSources = map[uint64]map[string]string{
 		ERC1155: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon-zkevm/erc1155.json",
 		Misc:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon-zkevm/misc.json",
 	},
-	// goerli
-	5: {
-		ERC20:   "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/goerli/erc20.json",
-		ERC721:  "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/goerli/erc721.json",
-		ERC1155: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/goerli/erc1155.json",
-		Misc:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/goerli/misc.json",
-	},
 	// mumbai
 	80001: {
 		ERC20:   "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mumbai/erc20.json",
