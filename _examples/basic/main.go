@@ -2,24 +2,39 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"flag"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/0xsequence/go-tokendirectory"
+	"github.com/lmittmann/tint"
 )
 
-func main() {
-	fmt.Println("go-tokendirectory example starting..")
+var debug = flag.Bool("debug", false, "enable debug logging")
 
-	updateFunc := func(ctx context.Context, chainID uint64, contractInfoList []tokendirectory.ContractInfo) {
-		for _, contractInfo := range contractInfoList {
-			fmt.Printf("updating %v\n", contractInfo.Address)
+func main() {
+	flag.Parse()
+
+	level := slog.LevelInfo
+	if *debug {
+		level = slog.LevelDebug
+	}
+	logger := slog.New(tint.NewHandler(os.Stderr, &tint.Options{Level: level}))
+
+	updateFunc := func(ctx context.Context, chainID uint64, list []tokendirectory.ContractInfo) {
+		logger := logger.With(slog.Uint64("chainID", chainID))
+		for _, c := range list {
+			logger.With(slog.String("address", c.Address), slog.String("name", c.Name)).Info("updated info")
 		}
 	}
+
+	logger.Info("go-tokendirectory example starting...")
 
 	options := []tokendirectory.Option{
 		tokendirectory.WithUpdateFuncs(updateFunc),
 		tokendirectory.WithUpdateInterval(time.Minute),
+		tokendirectory.WithLogger(logger),
 	}
 
 	tokenDirectory, err := tokendirectory.NewTokenDirectory(options...)
