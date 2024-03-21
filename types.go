@@ -1,6 +1,7 @@
 package tokendirectory
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -36,8 +37,27 @@ type ContractInfoExtension struct {
 	OriginAddress         string   `json:"originAddress,omitempty"`
 	Blacklist             bool     `json:"blacklist,omitempty"`
 	ContractABIExtensions []string `json:"contractABIExtensions,omitempty"`
-	Featured              int32    `json:"featured,omitempty"`
+	Featured              Featured `json:"featured,omitempty"`
 	Mute                  bool     `json:"mute,omitempty"`
 	Verified              bool     `json:"verified"`
 	VerifiedBy            string   `json:"verifiedBy,omitempty"`
+}
+
+// Featured is an integer that can be also unmarshaled from a bool, for retrocompatibility
+type Featured int32
+
+func (f *Featured) UnmarshalJSON(data []byte) error {
+	switch string(data) {
+	case "false":
+		*f = 0
+	case "true":
+		*f = 1
+	default:
+		var i int32
+		if err := json.Unmarshal(data, &i); err != nil {
+			return err
+		}
+		*f = Featured(i)
+	}
+	return nil
 }
