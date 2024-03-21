@@ -1,7 +1,7 @@
 package tokendirectory
 
 import (
-	"encoding/json"
+	"strconv"
 	"time"
 )
 
@@ -47,17 +47,17 @@ type ContractInfoExtension struct {
 type Featured int32
 
 func (f *Featured) UnmarshalJSON(data []byte) error {
-	switch string(data) {
+	switch d := string(data); d {
 	case "false":
 		*f = 0
 	case "true":
 		*f = 1
 	default:
-		var i int32
-		if err := json.Unmarshal(data, &i); err != nil {
+		v, err := strconv.ParseInt(d, 10, 32)
+		if err != nil {
 			return err
 		}
-		*f = Featured(i)
+		*f = Featured(v)
 	}
 	return nil
 }
