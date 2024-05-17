@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"log/slog"
+	"net/http"
 	"os"
 	"time"
 
@@ -31,10 +32,13 @@ func main() {
 
 	logger.Info("go-tokendirectory example starting...")
 
+	provider := tokendirectory.NewProvider(http.DefaultClient, tokendirectory.SourceTypeERC1155)
+
 	options := []tokendirectory.Option{
 		tokendirectory.WithUpdateFuncs(updateFunc),
 		tokendirectory.WithUpdateInterval(time.Minute),
 		tokendirectory.WithLogger(logger),
+		tokendirectory.WithProviders(provider),
 	}
 
 	tokenDirectory, err := tokendirectory.NewTokenDirectory(options...)

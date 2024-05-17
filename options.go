@@ -3,18 +3,10 @@ package tokendirectory
 import (
 	"fmt"
 	"log/slog"
-	"net/http"
 	"time"
 )
 
 type Option func(*TokenDirectory) error
-
-func WithHTTPClient(client *http.Client) Option {
-	return func(td *TokenDirectory) error {
-		td.httpClient = client
-		return nil
-	}
-}
 
 func WithLogger(logger *slog.Logger) Option {
 	return func(td *TokenDirectory) error {
