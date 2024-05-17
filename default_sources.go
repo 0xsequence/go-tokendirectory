@@ -156,4 +156,18 @@ var defaultSources = map[uint64]map[string]string{
 		ERC1155: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/optimism-sepolia/erc1155.json",
 		Misc:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/optimism-sepolia/misc.json",
 	},
+	// astar-zkevm
+	3776: {
+		ERC20:   "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/astar-zkevm/erc20.json",
+		ERC721:  "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/astar-zkevm/erc721.json",
+		ERC1155: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/astar-zkevm/erc1155.json",
+		Misc:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/astar-zkevm/misc.json",
+	},
+	// astar-zkyoto
+	6038361: {
+		ERC20:   "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/astar-zkyoto/erc20.json",
+		ERC721:  "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/astar-zkyoto/erc721.json",
+		ERC1155: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/astar-zkyoto/erc1155.json",
+		Misc:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/astar-zkyoto/misc.json",
+	},
 }
