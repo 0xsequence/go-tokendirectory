@@ -27,15 +27,11 @@ func NewTokenDirectory(options ...Option) (*TokenDirectory, error) {
 		}
 	}
 
-	if dir.httpClient == nil {
-		dir.httpClient = http.DefaultClient
-	}
 	if dir.updateInterval == 0 {
 		dir.updateInterval = time.Minute * 15
 	}
 	if len(dir.providers) == 0 {
-		p := &defaultProvider{client: dir.httpClient}
-		dir.providers = map[string]Provider{p.GetID(): p}
+		dir.providers = map[string]Provider{"default": NewProvider(http.DefaultClient)}
 	}
 
 	// initialize the token lists
@@ -61,7 +57,7 @@ type TokenDirectory struct {
 	onUpdate       []OnUpdateFunc
 	updateMu       sync.Mutex
 
-	httpClient *http.Client
+	//httpClient *http.Client
 
 	ctx     context.Context
 	ctxStop context.CancelFunc

@@ -17,34 +17,68 @@ type Provider interface {
 	FetchTokenList(ctx context.Context, chainID uint64, sourceName string) (*TokenList, error)
 }
 
-type defaultProvider struct {
-	client *http.Client
+func NewProvider(client *http.Client, types ...SourceType) Provider {
+	if client == nil {
+		client = http.DefaultClient
+	}
+
+	sources := _DefaultSources
+	if len(types) > 0 {
+		sources = make(map[uint64]map[SourceType]string, len(_DefaultSources))
+		for chainID, source := range _DefaultSources {
+			sources[chainID] = make(map[SourceType]string, len(types))
+			for _, t := range types {
+				if url, ok := source[t]; ok {
+					sources[chainID][t] = url
+				}
+			}
+		}
+	}
+
+	return urlListProvider{
+		client:  client,
+		sources: sources,
+	}
 }
 
-func (defaultProvider) GetID() string {
-	return "token-directory"
+type urlListProvider struct {
+	id      string
+	client  *http.Client
+	sources map[uint64]map[SourceType]string
+}
+
+func (p urlListProvider) GetID() string {
+	return p.id
 
 }
 
-func (defaultProvider) GetChainIDs() []uint64 {
-	chainIDs := make([]uint64, 0, len(defaultSources))
-	for chainID := range defaultSources {
+func (p urlListProvider) GetChainIDs() []uint64 {
+	chainIDs := make([]uint64, 0, len(p.sources))
+	for chainID := range p.sources {
 		chainIDs = append(chainIDs, chainID)
 	}
 	slices.Sort(chainIDs)
 	return chainIDs
 }
 
-func (defaultProvider) GetSources(chainID uint64) []string {
-	sources := make([]string, 0, len(defaultSources[chainID]))
-	for source := range defaultSources[chainID] {
-		sources = append(sources, source)
+func (p urlListProvider) GetSources(chainID uint64) []string {
+	sources := make([]string, 0, len(p.sources[chainID]))
+	for source := range p.sources[chainID] {
+		sources = append(sources, source.String())
 	}
 	return sources
 }
 
-func (p defaultProvider) FetchTokenList(ctx context.Context, chainID uint64, sourceName string) (*TokenList, error) {
-	req, err := http.NewRequest("GET", defaultSources[chainID][sourceName], nil)
+func (p urlListProvider) FetchTokenList(ctx context.Context, chainID uint64, sourceName string) (*TokenList, error) {
+	source, ok := p.sources[chainID]
+	if !ok {
+		return nil, fmt.Errorf("no sources for chain %d", chainID)
+	}
+	url, ok := source[SourceType(sourceName)]
+	if !ok {
+		return nil, fmt.Errorf("no source %q for chain %d", sourceName, chainID)
+	}
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
