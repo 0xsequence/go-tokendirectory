@@ -36,6 +36,7 @@ func NewProvider(client *http.Client, types ...SourceType) Provider {
 	}
 
 	return urlListProvider{
+		id:      "default",
 		client:  client,
 		sources: sources,
 	}

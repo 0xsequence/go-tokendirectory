@@ -155,7 +155,7 @@ func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, 
 	}
 	normalizeTokens(provider, tokenList)
 
-	t.lists[chainID][provider.GetID()] = tokenList
+	t.lists[chainID][source] = tokenList
 
 	for _, token := range tokenList.Tokens {
 		if token.Name == "" || token.Address == "" {
