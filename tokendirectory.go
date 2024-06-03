@@ -158,7 +158,7 @@ func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, 
 	t.contractsMu.Unlock()
 
 	tokenList, err := provider.FetchTokenList(ctx, chainID, source)
-	if err != nil {
+	if err != nil || tokenList == nil {
 		return
 	}
 	normalizeTokens(provider, tokenList)
