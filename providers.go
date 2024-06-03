@@ -13,11 +13,11 @@ var _DefaultMetadataSource = "https://metadata.sequence.app/"
 // Provider is a source of tokens, organized by chainID and sourceName.
 type Provider interface {
 	GetID() string
-	GetConfig(ctx context.Context) (chainIDs []uint64, sources []string, err error)
-	FetchTokenList(ctx context.Context, chainID uint64, sourceName string) (*TokenList, error)
+	GetConfig(ctx context.Context) (chainIDs []uint64, sources []SourceType, err error)
+	FetchTokenList(ctx context.Context, chainID uint64, source SourceType) (*TokenList, error)
 }
 
-func NewSequenceProvider(client *http.Client, rootURL string, types ...SourceType) (Provider, error) {
+func NewSequenceProvider(client *http.Client, rootURL string) (Provider, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -35,10 +35,10 @@ type sequenceProvider struct {
 	rootURL string
 }
 
-func (p sequenceProvider) GetConfig(ctx context.Context) (chainIDs []uint64, sources []string, err error) {
+func (p sequenceProvider) GetConfig(ctx context.Context) (chainIDs []uint64, sources []SourceType, err error) {
 	respBody := struct {
-		ChainIds []uint64 `json:"chainIds"`
-		Types    []string `json:"sources"`
+		ChainIds []uint64     `json:"chainIds"`
+		Types    []SourceType `json:"sources"`
 	}{}
 
 	resp, err := http.Get(p.rootURL + "/token-directory/")
@@ -62,8 +62,8 @@ func (p sequenceProvider) GetID() string {
 	return p.id
 }
 
-func (p sequenceProvider) FetchTokenList(ctx context.Context, chainID uint64, sourceName string) (*TokenList, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/token-directory/%d/%s.json", p.rootURL, chainID, sourceName), nil)
+func (p sequenceProvider) FetchTokenList(ctx context.Context, chainID uint64, source SourceType) (*TokenList, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/token-directory/%d/%s.json", p.rootURL, chainID, source), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}

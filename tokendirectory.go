@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,7 +18,7 @@ import (
 func NewTokenDirectory(options ...Option) (*TokenDirectory, error) {
 	dir := &TokenDirectory{
 		providers: make(map[string]Provider),
-		lists:     make(map[uint64]map[string]*TokenList),
+		lists:     make(map[uint64]map[SourceType]*TokenList),
 		contracts: make(map[uint64]map[prototyp.Hash]ContractInfo),
 	}
 
@@ -44,7 +45,7 @@ func NewTokenDirectory(options ...Option) (*TokenDirectory, error) {
 type TokenDirectory struct {
 	log       *slog.Logger
 	providers map[string]Provider
-	lists     map[uint64]map[string]*TokenList
+	lists     map[uint64]map[SourceType]*TokenList
 
 	contracts   map[uint64]map[prototyp.Hash]ContractInfo
 	contractsMu sync.RWMutex
@@ -53,7 +54,8 @@ type TokenDirectory struct {
 	onUpdate       []OnUpdateFunc
 	updateMu       sync.Mutex
 
-	//httpClient *http.Client
+	chainIDs []uint64
+	sources  []SourceType
 
 	ctx     context.Context
 	ctxStop context.CancelFunc
@@ -105,9 +107,15 @@ func (t *TokenDirectory) updateSources(ctx context.Context) error {
 			return fmt.Errorf("get config: %w", err)
 		}
 		for _, chainID := range chainIDs {
+			if len(t.chainIDs) > 0 && !slices.Contains(t.chainIDs, chainID) {
+				continue
+			}
 			for _, source := range sources {
+				if len(t.sources) > 0 && !slices.Contains(t.sources, source) {
+					continue
+				}
 				wg.Add(1)
-				go func(provider Provider, chainID uint64, source string) {
+				go func(provider Provider, chainID uint64, source SourceType) {
 					defer wg.Done()
 					t.updateProvider(ctx, provider, chainID, source)
 				}(provider, chainID, source)
@@ -118,7 +126,7 @@ func (t *TokenDirectory) updateSources(ctx context.Context) error {
 	return nil
 }
 
-func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, chainID uint64, source string) {
+func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, chainID uint64, source SourceType) {
 	t.updateMu.Lock()
 	var err error
 	defer func() {
@@ -127,7 +135,7 @@ func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, 
 			logger := t.log.With(
 				slog.String("provider", provider.GetID()),
 				slog.Uint64("chainId", chainID),
-				slog.String("source", source),
+				slog.String("source", source.String()),
 			)
 			if err != nil {
 				logger.Error("failed to update provider", slog.Any("err", err))
@@ -142,7 +150,7 @@ func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, 
 
 	t.contractsMu.Lock()
 	if _, ok := t.lists[chainID]; !ok {
-		t.lists[chainID] = make(map[string]*TokenList)
+		t.lists[chainID] = make(map[SourceType]*TokenList)
 	}
 	if _, ok := t.contracts[chainID]; !ok {
 		t.contracts[chainID] = make(map[prototyp.Hash]ContractInfo)
