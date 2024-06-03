@@ -32,7 +32,7 @@ func main() {
 
 	logger.Info("go-tokendirectory example starting...")
 
-	provider := tokendirectory.NewProvider(http.DefaultClient, tokendirectory.SourceTypeERC1155)
+	provider := tokendirectory.NewDefaultSequenceProvider(http.DefaultClient, tokendirectory.SourceTypeERC1155)
 
 	options := []tokendirectory.Option{
 		tokendirectory.WithUpdateFuncs(updateFunc),

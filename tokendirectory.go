@@ -31,7 +31,7 @@ func NewTokenDirectory(options ...Option) (*TokenDirectory, error) {
 		dir.updateInterval = time.Minute * 15
 	}
 	if len(dir.providers) == 0 {
-		seqProvider, err := NewDefaultSequenceProvider(http.DefaultClient)
+		seqProvider, err := NewDefaultSequenceProvider(http.DefaultClient, _DefaultMetadataSource)
 		if err != nil {
 			return nil, err
 		}

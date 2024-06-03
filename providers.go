@@ -20,15 +20,15 @@ type Provider interface {
 	FetchTokenList(ctx context.Context, chainID uint64, sourceName string) (*TokenList, error)
 }
 
-func NewDefaultSequenceProvider(client *http.Client) (Provider, error) {
+func NewDefaultSequenceProvider(client *http.Client, metadataSource string, types ...SourceType) (Provider, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
 
-	return initializeSequenceMetadataProvider(client, _DefaultMetadataSource)
+	return initializeSequenceMetadataProvider(client, metadataSource, types...)
 }
 
-func initializeSequenceMetadataProvider(client *http.Client, rootUrl string) (Provider, error) {
+func initializeSequenceMetadataProvider(client *http.Client, rootUrl string, types ...SourceType) (Provider, error) {
 	respBody := struct {
 		ChainIds []uint64 `json:"chainIds"`
 		Types    []string `json:"sources"`
@@ -55,6 +55,16 @@ func initializeSequenceMetadataProvider(client *http.Client, rootUrl string) (Pr
 		sources[chainID] = make(map[SourceType]string)
 		for _, t := range respBody.Types {
 			sources[chainID][SourceType(strings.ToLower(t))] = fmt.Sprintf("%s/token-directory/%d/%s.json", rootUrl, chainID, t)
+		}
+	}
+
+	if len(types) > 0 {
+		for chainID, source := range sources {
+			for _, t := range types {
+				if _, ok := source[t]; !ok {
+					delete(sources[chainID], t)
+				}
+			}
 		}
 	}
 
