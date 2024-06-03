@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"slices"
-	"strings"
 )
 
 var _DefaultMetadataSource = "https://metadata.sequence.app/"
@@ -15,106 +13,57 @@ var _DefaultMetadataSource = "https://metadata.sequence.app/"
 // Provider is a source of tokens, organized by chainID and sourceName.
 type Provider interface {
 	GetID() string
-	GetChainIDs() []uint64
-	GetSources(chainID uint64) []string
+	GetConfig(ctx context.Context) (chainIDs []uint64, sources []string, err error)
 	FetchTokenList(ctx context.Context, chainID uint64, sourceName string) (*TokenList, error)
 }
 
-func NewDefaultSequenceProvider(client *http.Client, metadataSource string, types ...SourceType) (Provider, error) {
+func NewSequenceProvider(client *http.Client, rootURL string, types ...SourceType) (Provider, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
 
-	return initializeSequenceMetadataProvider(client, metadataSource, types...)
+	return sequenceProvider{
+		id:      "default",
+		client:  client,
+		rootURL: rootURL,
+	}, nil
 }
 
-func initializeSequenceMetadataProvider(client *http.Client, rootUrl string, types ...SourceType) (Provider, error) {
+type sequenceProvider struct {
+	id      string
+	client  *http.Client
+	rootURL string
+}
+
+func (p sequenceProvider) GetConfig(ctx context.Context) (chainIDs []uint64, sources []string, err error) {
 	respBody := struct {
 		ChainIds []uint64 `json:"chainIds"`
 		Types    []string `json:"sources"`
 	}{}
 
-	resp, err := http.Get(rootUrl + "/token-directory/")
+	resp, err := http.Get(p.rootURL + "/token-directory/")
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch token-directory info: %w", err)
+		return nil, nil, fmt.Errorf("info: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch token-directory info: %s", resp.Status)
+		return nil, nil, fmt.Errorf("info: %s", resp.Status)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, nil, fmt.Errorf("decode: %w", err)
 	}
 
-	slices.Sort(respBody.ChainIds)
-
-	sources := make(map[uint64]map[SourceType]string)
-	for _, chainID := range respBody.ChainIds {
-		sources[chainID] = make(map[SourceType]string)
-		for _, t := range respBody.Types {
-			sources[chainID][SourceType(strings.ToLower(t))] = fmt.Sprintf("%s/token-directory/%d/%s.json", rootUrl, chainID, t)
-		}
-	}
-
-	if len(types) > 0 {
-		for chainID, source := range sources {
-			for _, t := range types {
-				if _, ok := source[t]; !ok {
-					delete(sources[chainID], t)
-				}
-			}
-		}
-	}
-
-	return sequenceMetadataProvider{
-		id:      "default",
-		client:  client,
-		rootUrl: rootUrl,
-		sources: sources,
-	}, nil
+	return respBody.ChainIds, respBody.Types, nil
 }
 
-type sequenceMetadataProvider struct {
-	id      string
-	client  *http.Client
-	rootUrl string
-	sources map[uint64]map[SourceType]string
-}
-
-func (p sequenceMetadataProvider) GetID() string {
+func (p sequenceProvider) GetID() string {
 	return p.id
-
 }
 
-func (p sequenceMetadataProvider) GetChainIDs() []uint64 {
-	chainIDs := make([]uint64, 0, len(p.sources))
-	for chainID := range p.sources {
-		chainIDs = append(chainIDs, chainID)
-	}
-	slices.Sort(chainIDs)
-	return chainIDs
-}
-
-func (p sequenceMetadataProvider) GetSources(chainID uint64) []string {
-	sources := make([]string, 0, len(p.sources[chainID]))
-	for source := range p.sources[chainID] {
-		sources = append(sources, source.String())
-	}
-	return sources
-}
-
-func (p sequenceMetadataProvider) FetchTokenList(ctx context.Context, chainID uint64, sourceName string) (*TokenList, error) {
-	source, ok := p.sources[chainID]
-	if !ok {
-		return nil, fmt.Errorf("no sources for chain %d", chainID)
-	}
-	url, ok := source[SourceType(strings.ToLower(sourceName))]
-	if !ok {
-		return nil, fmt.Errorf("no source %q for chain %d", sourceName, chainID)
-	}
-	req, err := http.NewRequest("GET", url, nil)
+func (p sequenceProvider) FetchTokenList(ctx context.Context, chainID uint64, sourceName string) (*TokenList, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/token-directory/%d/%s.json", p.rootURL, chainID, sourceName), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}

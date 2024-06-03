@@ -31,19 +31,11 @@ func NewTokenDirectory(options ...Option) (*TokenDirectory, error) {
 		dir.updateInterval = time.Minute * 15
 	}
 	if len(dir.providers) == 0 {
-		seqProvider, err := NewDefaultSequenceProvider(http.DefaultClient, _DefaultMetadataSource)
+		seqProvider, err := NewSequenceProvider(http.DefaultClient, _DefaultMetadataSource)
 		if err != nil {
 			return nil, err
 		}
 		dir.providers = map[string]Provider{"default": seqProvider}
-	}
-
-	// initialize the token lists
-	for _, source := range dir.providers {
-		for _, chainId := range source.GetChainIDs() {
-			dir.lists[chainId] = make(map[string]*TokenList)
-			dir.contracts[chainId] = make(map[prototyp.Hash]ContractInfo)
-		}
 	}
 
 	return dir, nil
@@ -108,8 +100,12 @@ func (t *TokenDirectory) IsRunning() bool {
 func (t *TokenDirectory) updateSources(ctx context.Context) error {
 	wg := &sync.WaitGroup{}
 	for _, provider := range t.providers {
-		for _, chainID := range provider.GetChainIDs() {
-			for _, source := range provider.GetSources(chainID) {
+		chainIDs, sources, err := provider.GetConfig(ctx)
+		if err != nil {
+			return fmt.Errorf("get config: %w", err)
+		}
+		for _, chainID := range chainIDs {
+			for _, source := range sources {
 				wg.Add(1)
 				go func(provider Provider, chainID uint64, source string) {
 					defer wg.Done()
