@@ -31,7 +31,11 @@ func NewTokenDirectory(options ...Option) (*TokenDirectory, error) {
 		dir.updateInterval = time.Minute * 15
 	}
 	if len(dir.providers) == 0 {
-		dir.providers = map[string]Provider{"default": NewProvider(http.DefaultClient)}
+		seqProvider, err := NewDefaultSequenceProvider(http.DefaultClient)
+		if err != nil {
+			return nil, err
+		}
+		dir.providers = map[string]Provider{"default": seqProvider}
 	}
 
 	// initialize the token lists
