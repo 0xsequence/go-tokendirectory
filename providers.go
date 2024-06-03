@@ -34,7 +34,7 @@ func initializeSequenceMetadataProvider(client *http.Client, rootUrl string, typ
 		Types    []string `json:"sources"`
 	}{}
 
-	resp, err := http.Get(_DefaultMetadataSource + "/token-directory/")
+	resp, err := http.Get(rootUrl + "/token-directory/")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch token-directory info: %w", err)
 	}
