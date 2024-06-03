@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-var _DefaultMetadataSource = "https://metadata.sequence.app/"
+var _DefaultMetadataSource = "https://metadata.sequence.app"
 
 // Provider is a source of tokens, organized by chainID and sourceName.
 type Provider interface {
