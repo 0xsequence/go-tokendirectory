@@ -46,3 +46,17 @@ func WithUpdateInterval(interval time.Duration) Option {
 		return nil
 	}
 }
+
+func WithChainIDs(chainIDs ...uint64) Option {
+	return func(td *TokenDirectory) error {
+		td.chainIDs = chainIDs
+		return nil
+	}
+}
+
+func WithSources(sources ...SourceType) Option {
+	return func(td *TokenDirectory) error {
+		td.sources = sources
+		return nil
+	}
+}

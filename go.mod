@@ -1,6 +1,8 @@
 module github.com/0xsequence/go-tokendirectory
 
-go 1.18
+go 1.21
+
+toolchain go1.21.0
 
 require github.com/0xsequence/go-sequence v0.25.0
 

@@ -32,13 +32,17 @@ func main() {
 
 	logger.Info("go-tokendirectory example starting...")
 
-	provider := tokendirectory.NewProvider(http.DefaultClient, tokendirectory.SourceTypeERC1155)
+	provider, err := tokendirectory.NewSequenceProvider(http.DefaultClient, "https://dev-metadata.sequence.app")
+	if err != nil {
+		panic(err)
+	}
 
 	options := []tokendirectory.Option{
 		tokendirectory.WithUpdateFuncs(updateFunc),
 		tokendirectory.WithUpdateInterval(time.Minute),
 		tokendirectory.WithLogger(logger),
 		tokendirectory.WithProviders(provider),
+		tokendirectory.WithSources(tokendirectory.SourceTypeERC1155),
 	}
 
 	tokenDirectory, err := tokendirectory.NewTokenDirectory(options...)
