@@ -17,7 +17,11 @@ type Provider interface {
 	FetchTokenList(ctx context.Context, chainID uint64, source SourceType) (*TokenList, error)
 }
 
-func NewSequenceProvider(client *http.Client, rootURL string) (Provider, error) {
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+func NewSequenceProvider(client HTTPClient, rootURL string) (Provider, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -31,7 +35,7 @@ func NewSequenceProvider(client *http.Client, rootURL string) (Provider, error) 
 
 type sequenceProvider struct {
 	id      string
-	client  *http.Client
+	client  HTTPClient
 	rootURL string
 }
 
