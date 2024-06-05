@@ -21,7 +21,7 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-func NewSequenceProvider(client HTTPClient, rootURL string) (Provider, error) {
+func NewSequenceProvider(baseURL string, client HTTPClient) (Provider, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -29,14 +29,14 @@ func NewSequenceProvider(client HTTPClient, rootURL string) (Provider, error) {
 	return sequenceProvider{
 		id:      "default",
 		client:  client,
-		rootURL: rootURL,
+		baseURL: baseURL,
 	}, nil
 }
 
 type sequenceProvider struct {
 	id      string
 	client  HTTPClient
-	rootURL string
+	baseURL string
 }
 
 func (p sequenceProvider) GetConfig(ctx context.Context) (chainIDs []uint64, sources []SourceType, err error) {
@@ -45,7 +45,7 @@ func (p sequenceProvider) GetConfig(ctx context.Context) (chainIDs []uint64, sou
 		Types    []SourceType `json:"sources"`
 	}{}
 
-	resp, err := http.Get(p.rootURL + "/token-directory/")
+	resp, err := http.Get(p.baseURL + "/token-directory/")
 	if err != nil {
 		return nil, nil, fmt.Errorf("info: %w", err)
 	}
@@ -67,7 +67,7 @@ func (p sequenceProvider) GetID() string {
 }
 
 func (p sequenceProvider) FetchTokenList(ctx context.Context, chainID uint64, source SourceType) (*TokenList, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/token-directory/%d/%s.json", p.rootURL, chainID, source), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/token-directory/%d/%s.json", p.baseURL, chainID, source), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
