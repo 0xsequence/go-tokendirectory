@@ -107,7 +107,7 @@ func LegacyProvider() Provider {
 	return urlListProvider{
 		id:      "legacy",
 		client:  http.DefaultClient,
-		sources: _LegacySources,
+		sources: LegacySources,
 	}
 
 }
