@@ -18,9 +18,9 @@ const (
 	SourceTypeCoinGecko SourceType = "coingecko"
 )
 
-// _LegacySources tokenDirectorySources, order of precedence is from top to bottom, meaning
+// LegacySources tokenDirectorySources, order of precedence is from top to bottom, meaning
 // token info in lists higher up take precedence.
-var _LegacySources = map[uint64]map[SourceType]string{
+var LegacySources = map[uint64]map[SourceType]string{
 	// mainnet
 	1: {
 		SourceTypeERC20:     "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc20.json",
