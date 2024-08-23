@@ -27,7 +27,7 @@ func NewSequenceProvider(baseURL string, client HTTPClient) (Provider, error) {
 	}
 
 	return sequenceProvider{
-		id:      "default",
+		id:      "sequence-token-directory",
 		client:  client,
 		baseURL: baseURL,
 	}, nil
@@ -105,7 +105,7 @@ func (p sequenceProvider) FetchTokenList(ctx context.Context, chainID uint64, so
 
 func LegacyProvider() Provider {
 	return urlListProvider{
-		id:      "legacy",
+		id:      "legacy-token-directory",
 		client:  http.DefaultClient,
 		sources: LegacySources,
 	}
