@@ -28,16 +28,22 @@ type ContractInfo struct {
 }
 
 type ContractInfoExtension struct {
-	Link                  string   `json:"link,omitempty"`
-	Description           string   `json:"description,omitempty"`
-	OgName                string   `json:"ogName,omitempty"`
-	OgImage               string   `json:"ogImage,omitempty"`
-	OriginChainID         uint64   `json:"originChainId,omitempty"`
-	OriginAddress         string   `json:"originAddress,omitempty"`
+	Link        string `json:"link,omitempty"`
+	Description string `json:"description,omitempty"`
+
+	OgName        string `json:"ogName,omitempty"`
+	OgImage       string `json:"ogImage,omitempty"`
+	OriginChainID uint64 `json:"originChainId,omitempty"`
+	OriginAddress string `json:"originAddress,omitempty"`
+
 	Blacklist             bool     `json:"blacklist,omitempty"`
 	ContractABIExtensions []string `json:"contractABIExtensions,omitempty"`
-	Featured              bool     `json:"featured,omitempty"`
-	Mute                  bool     `json:"mute,omitempty"`
-	Verified              bool     `json:"verified"`
-	VerifiedBy            string   `json:"verifiedBy,omitempty"`
+
+	SupportsDecimals bool `json:"supportsDecimals,omitempty"`
+
+	Featured bool `json:"featured,omitempty"`
+	Mute     bool `json:"mute,omitempty"`
+
+	Verified   bool   `json:"verified"`
+	VerifiedBy string `json:"verifiedBy,omitempty"`
 }
