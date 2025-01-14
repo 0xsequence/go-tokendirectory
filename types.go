@@ -28,8 +28,9 @@ type ContractInfo struct {
 }
 
 type ContractInfoExtension struct {
-	Link        string `json:"link,omitempty"`
-	Description string `json:"description,omitempty"`
+	Link        string   `json:"link,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Categories  []string `json:"categories,omitempty"`
 
 	OgName        string `json:"ogName,omitempty"`
 	OgImage       string `json:"ogImage,omitempty"`
