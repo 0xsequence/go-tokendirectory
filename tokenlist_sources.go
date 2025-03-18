@@ -1,5 +1,7 @@
 package tokendirectory
 
+import "maps"
+
 type SourceType string
 
 func (s SourceType) String() string {
@@ -18,18 +20,15 @@ const (
 	SourceTypeCoinGecko SourceType = "coingecko"
 )
 
-// LegacySources tokenDirectorySources, order of precedence is from top to bottom, meaning
+// SequenceGithubSources tokenDirectorySources, order of precedence is from top to bottom, meaning
 // token info in lists higher up take precedence.
-var LegacySources = map[uint64]map[SourceType]string{
+var SequenceGithubSources = map[uint64]map[SourceType]string{
 	// mainnet
 	1: {
-		SourceTypeERC20:     "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc20.json",
-		SourceTypeERC721:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc721.json",
-		SourceTypeERC1155:   "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc1155.json",
-		SourceTypeMisc:      "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/misc.json",
-		SourceTypeUniswap:   "https://unpkg.com/@uniswap/default-token-list@4.1.0/build/uniswap-default.tokenlist.json",
-		SourceTypeSushi:     "https://unpkg.com/@sushiswap/default-token-list@34.0.0/build/sushiswap-default.tokenlist.json",
-		SourceTypeCoinGecko: "https://tokens.coingecko.com/uniswap/all.json",
+		SourceTypeERC20:   "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc20.json",
+		SourceTypeERC721:  "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc721.json",
+		SourceTypeERC1155: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc1155.json",
+		SourceTypeMisc:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/misc.json",
 	},
 	// polygon
 	137: {
@@ -37,7 +36,6 @@ var LegacySources = map[uint64]map[SourceType]string{
 		SourceTypeERC721:  "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon/erc721.json",
 		SourceTypeERC1155: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon/erc1155.json",
 		SourceTypeMisc:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon/misc.json",
-		SourceTypeSushi:   "https://unpkg.com/@sushiswap/default-token-list@34.0.0/build/sushiswap-default.tokenlist.json",
 	},
 	// polygon zkevm
 	1101: {
@@ -59,7 +57,6 @@ var LegacySources = map[uint64]map[SourceType]string{
 		SourceTypeERC721:  "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/bnb/erc721.json",
 		SourceTypeERC1155: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/bnb/erc1155.json",
 		SourceTypeMisc:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/bnb/misc.json",
-		SourceTypePancake: "https://raw.githubusercontent.com/pancakeswap/pancake-toolkit/master/packages/token-lists/lists/pancakeswap-default.json",
 	},
 	// BSC-testnet
 	97: {
@@ -81,7 +78,6 @@ var LegacySources = map[uint64]map[SourceType]string{
 		SourceTypeERC721:  "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/arbitrum-nova/erc721.json",
 		SourceTypeERC1155: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/arbitrum-nova/erc1155.json",
 		SourceTypeMisc:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/arbitrum-nova/misc.json",
-		SourceTypeSushi:   "https://raw.githubusercontent.com/sushiswap/list/master/lists/token-lists/default-token-list/tokens/arbitrum-nova.json",
 	},
 	// avalanche
 	43114: {
@@ -89,7 +85,6 @@ var LegacySources = map[uint64]map[SourceType]string{
 		SourceTypeERC721:  "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/avalanche/erc721.json",
 		SourceTypeERC1155: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/avalanche/erc1155.json",
 		SourceTypeMisc:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/avalanche/misc.json",
-		SourceTypeSushi:   "https://raw.githubusercontent.com/sushiswap/list/master/lists/token-lists/default-token-list/tokens/avalanche.json",
 	},
 	// optimism
 	10: {
@@ -104,7 +99,6 @@ var LegacySources = map[uint64]map[SourceType]string{
 		SourceTypeERC721:  "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/gnosis/erc721.json",
 		SourceTypeERC1155: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/gnosis/erc1155.json",
 		SourceTypeMisc:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/gnosis/misc.json",
-		SourceTypeSushi:   "https://raw.githubusercontent.com/sushiswap/list/master/lists/token-lists/default-token-list/tokens/xdai.json",
 	},
 	// base
 	8453: {
@@ -176,4 +170,66 @@ var LegacySources = map[uint64]map[SourceType]string{
 		SourceTypeERC1155: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/astar-zkyoto/erc1155.json",
 		SourceTypeMisc:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/astar-zkyoto/misc.json",
 	},
+}
+
+var UniswapSources = map[uint64]map[SourceType]string{
+	// mainnet
+	1: {
+		SourceTypeUniswap: "https://unpkg.com/@uniswap/default-token-list@4.1.0/build/uniswap-default.tokenlist.json",
+	},
+}
+
+var SushiSources = map[uint64]map[SourceType]string{
+	// mainnet
+	1: {
+		SourceTypeSushi: "https://unpkg.com/@sushiswap/default-token-list@34.0.0/build/sushiswap-default.tokenlist.json",
+	},
+	// polygon
+	137: {
+		SourceTypeSushi: "https://unpkg.com/@sushiswap/default-token-list@34.0.0/build/sushiswap-default.tokenlist.json",
+	},
+	// arbitrum-nova
+	42170: {
+		SourceTypeSushi: "https://raw.githubusercontent.com/sushiswap/list/master/lists/token-lists/default-token-list/tokens/arbitrum-nova.json",
+	},
+	// avalanche
+	43114: {
+		SourceTypeSushi: "https://raw.githubusercontent.com/sushiswap/list/master/lists/token-lists/default-token-list/tokens/avalanche.json",
+	},
+	// gnosis
+	100: {
+		SourceTypeSushi: "https://raw.githubusercontent.com/sushiswap/list/master/lists/token-lists/default-token-list/tokens/xdai.json",
+	},
+}
+
+var CoinGeckoSources = map[uint64]map[SourceType]string{
+	// mainnet
+	1: {
+		SourceTypeCoinGecko: "https://tokens.coingecko.com/uniswap/all.json",
+	},
+}
+
+var PancakeSources = map[uint64]map[SourceType]string{
+	// BSC
+	56: {
+		SourceTypePancake: "https://raw.githubusercontent.com/pancakeswap/pancake-toolkit/master/packages/token-lists/lists/pancakeswap-default.json",
+	},
+}
+
+func MergeSources(sources ...map[uint64]map[SourceType]string) map[uint64]map[SourceType]string {
+	mergedSources := make(map[uint64]map[SourceType]string)
+	for _, source := range sources {
+		for chainID, chainSources := range source {
+			s, ok := mergedSources[chainID]
+			if !ok {
+				mergedSources[chainID] = make(map[SourceType]string)
+				maps.Copy(mergedSources[chainID], chainSources)
+			} else {
+				for sourceType, sourceURL := range chainSources {
+					s[sourceType] = sourceURL
+				}
+			}
+		}
+	}
+	return mergedSources
 }

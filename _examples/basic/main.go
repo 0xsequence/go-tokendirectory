@@ -32,7 +32,7 @@ func main() {
 
 	logger.Info("go-tokendirectory example starting...")
 
-	provider, err := tokendirectory.NewSequenceProvider(http.DefaultClient, "https://dev-metadata.sequence.app")
+	provider, err := tokendirectory.NewSequenceProvider("https://dev-metadata.sequence.app", http.DefaultClient)
 	if err != nil {
 		panic(err)
 	}
