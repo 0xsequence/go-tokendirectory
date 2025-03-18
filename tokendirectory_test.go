@@ -621,9 +621,17 @@ func TestTokenDirectory_Run(t *testing.T) {
 	// Verify it's running
 	assert.True(t, dir.IsRunning())
 
-	// Verify initial fetch happened
-	assert.Len(t, dir.contracts, 1)
-	assert.Len(t, dir.contracts[1], 1)
+	// Verify initial fetch happened by using the public API methods instead of
+	// directly accessing the contracts map
+	networks, err := dir.GetNetworks(ctx)
+	require.NoError(t, err)
+	assert.Len(t, networks, 1)
+	assert.Contains(t, networks, uint64(1))
+
+	// Check tokens for chain ID 1
+	tokens, err := dir.GetTokens(ctx, 1)
+	require.NoError(t, err)
+	assert.Len(t, tokens, 1)
 
 	// Stop the directory
 	dir.Stop()

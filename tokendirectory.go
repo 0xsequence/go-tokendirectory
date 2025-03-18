@@ -225,36 +225,50 @@ func (t *TokenDirectory) GetContractInfo(ctx context.Context, chainId uint64, co
 }
 
 func (t *TokenDirectory) GetNetworks(ctx context.Context) ([]uint64, error) {
-	chainIDs := make([]uint64, 0, len(t.lists))
-	for chainID := range t.lists {
-		list, err := t.GetTokens(ctx, chainID)
-		if err != nil {
-			return nil, err
-		}
-		if len(list) == 0 {
-			continue
-		}
+	t.contractsMu.RLock()
+	defer t.contractsMu.RUnlock()
+
+	var chainIDs []uint64
+	for chainID, _ := range t.contracts {
 		chainIDs = append(chainIDs, chainID)
 	}
 	return chainIDs, nil
 }
 
 func (t *TokenDirectory) GetAllTokens(ctx context.Context) ([]ContractInfo, error) {
+	t.contractsMu.RLock()
+
+	// Get all chain IDs first
+	var chainIDs []uint64
+	for chainID := range t.contracts {
+		chainIDs = append(chainIDs, chainID)
+	}
+
+	t.contractsMu.RUnlock()
+
+	// Now fetch tokens for each chain ID using GetTokens which has its own locking
 	var tokens []ContractInfo
-	for chainID := range t.lists {
+	for _, chainID := range chainIDs {
 		list, err := t.GetTokens(ctx, chainID)
 		if err != nil {
 			return nil, err
 		}
 		tokens = append(tokens, list...)
 	}
+
 	return tokens, nil
 }
 
 func (t *TokenDirectory) GetTokens(ctx context.Context, chainID uint64) ([]ContractInfo, error) {
-	tokens := make([]ContractInfo, 0, len(t.lists[chainID]))
-	for _, list := range t.lists[chainID] {
-		tokens = append(tokens, list.Tokens...)
+	t.contractsMu.RLock()
+	defer t.contractsMu.RUnlock()
+
+	if _, ok := t.contracts[chainID]; !ok {
+		return []ContractInfo{}, nil
+	}
+	tokens := make([]ContractInfo, 0, len(t.contracts[chainID]))
+	for _, token := range t.contracts[chainID] {
+		tokens = append(tokens, token)
 	}
 	return tokens, nil
 }
