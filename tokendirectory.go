@@ -82,7 +82,9 @@ func (t *TokenDirectory) Run(ctx context.Context) error {
 	defer atomic.StoreInt32(&t.running, 0)
 
 	// Initial source fetch
-	t.updateSources(t.ctx)
+	if err := t.updateSources(t.ctx); err != nil {
+		return fmt.Errorf("initial source fetch: %w", err)
+	}
 
 	// Fetch on interval
 	for {
@@ -90,7 +92,10 @@ func (t *TokenDirectory) Run(ctx context.Context) error {
 		case <-t.ctx.Done():
 			return nil
 		case <-time.After(t.updateInterval):
-			t.updateSources(t.ctx)
+			if err := t.updateSources(t.ctx); err != nil {
+				t.log.Error("failed to update sources", slog.Any("err", err))
+				// Continue running despite errors
+			}
 		}
 	}
 }
@@ -150,18 +155,10 @@ func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, 
 		}
 	}()
 
-	updatedContractInfo := []ContractInfo{}
-	seen := map[string]struct{}{}
+	// Initialize maps if they don't exist
+	t.ensureMapsInitialized(chainID)
 
-	t.contractsMu.Lock()
-	if _, ok := t.lists[chainID]; !ok {
-		t.lists[chainID] = make(map[SourceType]*TokenList)
-	}
-	if _, ok := t.contracts[chainID]; !ok {
-		t.contracts[chainID] = make(map[prototyp.Hash]ContractInfo)
-	}
-	t.contractsMu.Unlock()
-
+	// Fetch token list
 	tokenList, err := provider.FetchTokenList(ctx, chainID, source)
 	if err != nil || tokenList == nil {
 		return
@@ -170,11 +167,33 @@ func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, 
 
 	t.lists[chainID][source] = tokenList
 
+	// Process and store tokens
+	updatedContractInfo := t.processTokenList(chainID, tokenList)
+
+	// Trigger update callbacks
+	t.triggerUpdateCallbacks(ctx, chainID, updatedContractInfo)
+}
+
+// ensureMapsInitialized ensures the maps for a chain ID are initialized
+func (t *TokenDirectory) ensureMapsInitialized(chainID uint64) {
+	t.contractsMu.Lock()
+	defer t.contractsMu.Unlock()
+
+	if _, ok := t.lists[chainID]; !ok {
+		t.lists[chainID] = make(map[SourceType]*TokenList)
+	}
+	if _, ok := t.contracts[chainID]; !ok {
+		t.contracts[chainID] = make(map[prototyp.Hash]ContractInfo)
+	}
+}
+
+// processTokenList processes the token list and stores tokens in the contract map
+func (t *TokenDirectory) processTokenList(chainID uint64, tokenList *TokenList) []ContractInfo {
+	updatedContractInfo := []ContractInfo{}
+	seen := map[string]struct{}{}
+
 	for _, token := range tokenList.Tokens {
-		if token.Name == "" || token.Address == "" {
-			continue
-		}
-		if token.ChainID != chainID {
+		if !t.isValidToken(token, chainID) {
 			continue
 		}
 
@@ -200,11 +219,19 @@ func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, 
 		seen[token.Address] = struct{}{}
 	}
 
-	if t.onUpdate != nil {
-		if len(updatedContractInfo) > 0 {
-			for i := range t.onUpdate {
-				go t.onUpdate[i](ctx, chainID, updatedContractInfo)
-			}
+	return updatedContractInfo
+}
+
+// isValidToken checks if a token is valid for inclusion
+func (t *TokenDirectory) isValidToken(token ContractInfo, chainID uint64) bool {
+	return token.Name != "" && token.Address != "" && token.ChainID == chainID
+}
+
+// triggerUpdateCallbacks triggers the registered update callbacks
+func (t *TokenDirectory) triggerUpdateCallbacks(ctx context.Context, chainID uint64, updatedContractInfo []ContractInfo) {
+	if t.onUpdate != nil && len(updatedContractInfo) > 0 {
+		for i := range t.onUpdate {
+			go t.onUpdate[i](ctx, chainID, updatedContractInfo)
 		}
 	}
 }
@@ -229,7 +256,7 @@ func (t *TokenDirectory) GetNetworks(ctx context.Context) ([]uint64, error) {
 	defer t.contractsMu.RUnlock()
 
 	var chainIDs []uint64
-	for chainID, _ := range t.contracts {
+	for chainID := range t.contracts {
 		chainIDs = append(chainIDs, chainID)
 	}
 	return chainIDs, nil

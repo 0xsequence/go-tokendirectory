@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path"
 )
 
 func NewSequenceProvider(baseURL string, client HTTPClient) (Provider, error) {
+	if len(baseURL) == 0 {
+		return nil, fmt.Errorf("baseURL is required")
+	}
+
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -33,7 +36,13 @@ func (p sequenceProvider) GetConfig(ctx context.Context) (chainIDs []uint64, sou
 		Types    []SourceType `json:"sources"`
 	}{}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", path.Join(p.baseURL, "/token-directory/"), nil)
+	baseURL := p.baseURL
+	if baseURL[len(baseURL)-1] != '/' {
+		baseURL = baseURL + "/"
+	}
+	url := baseURL + "token-directory/"
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -60,7 +69,13 @@ func (p sequenceProvider) GetID() string {
 }
 
 func (p sequenceProvider) FetchTokenList(ctx context.Context, chainID uint64, source SourceType) (*TokenList, error) {
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/token-directory/%d/%s.json", p.baseURL, chainID, source), nil)
+	baseURL := p.baseURL
+	if baseURL[len(baseURL)-1] != '/' {
+		baseURL = baseURL + "/"
+	}
+	url := fmt.Sprintf("%stoken-directory/%d/%s.json", baseURL, chainID, source)
+
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}

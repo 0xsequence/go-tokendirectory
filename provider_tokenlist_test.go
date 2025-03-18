@@ -175,7 +175,9 @@ func TestTokenListProvider_FetchTokenList(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write(tokenListJSON)
+			if _, err := w.Write(tokenListJSON); err != nil {
+				t.Fatalf("Failed to write response: %v", err)
+			}
 		}))
 		defer server.Close()
 
@@ -217,7 +219,9 @@ func TestTokenListProvider_FetchTokenList(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write(tokensJSON)
+			if _, err := w.Write(tokensJSON); err != nil {
+				t.Fatalf("Failed to write response: %v", err)
+			}
 		}))
 		defer server.Close()
 
@@ -268,7 +272,9 @@ func TestTokenListProvider_FetchTokenList(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("invalid json"))
+			if _, err := w.Write([]byte("invalid json")); err != nil {
+				t.Fatalf("Failed to write response: %v", err)
+			}
 		}))
 		defer server.Close()
 
@@ -334,7 +340,9 @@ func TestTokenListProvider_FetchTokenList(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write(tokenListJSON)
+			if _, err := w.Write(tokenListJSON); err != nil {
+				t.Fatalf("Failed to write response: %v", err)
+			}
 		}))
 		defer server.Close()
 
