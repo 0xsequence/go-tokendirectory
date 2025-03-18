@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -37,6 +38,10 @@ func NewTokenDirectory(options ...Option) (*TokenDirectory, error) {
 			return nil, err
 		}
 		dir.providers = map[string]Provider{"default": seqProvider}
+	}
+	if dir.log == nil {
+		// Use a no-op logger by default
+		dir.log = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 
 	return dir, nil
