@@ -1,0 +1,36 @@
+run:
+  timeout: 5m
+  tests: true
+  skip-dirs:
+    - vendor
+
+linters:
+  enable:
+    - gofmt
+    - goimports
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - staticcheck
+    - unused
+    - typecheck
+    - errcheck
+    - bodyclose
+    - gocyclo
+    - gosec
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  goimports:
+    local-prefixes: github.com/0xsequence/go-tokendirectory
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - gosec
+  max-issues-per-linter: 0
+  max-same-issues: 0 
