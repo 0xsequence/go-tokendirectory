@@ -23,7 +23,7 @@ func TestNewTokenListProvider(t *testing.T) {
 			name:            "Default sources",
 			sources:         nil,
 			client:          nil,
-			expectDefaultID: "legacy-token-directory",
+			expectDefaultID: "tokenlist-directory",
 		},
 		{
 			name: "Custom sources",
@@ -35,13 +35,13 @@ func TestNewTokenListProvider(t *testing.T) {
 				},
 			},
 			client:          nil,
-			expectDefaultID: "legacy-token-directory",
+			expectDefaultID: "tokenlist-directory",
 		},
 		{
 			name:            "Default sources with custom client",
 			sources:         nil,
 			client:          &http.Client{},
-			expectDefaultID: "legacy-token-directory",
+			expectDefaultID: "tokenlist-directory",
 		},
 		{
 			name: "Custom sources with custom client",
@@ -53,7 +53,7 @@ func TestNewTokenListProvider(t *testing.T) {
 				},
 			},
 			client:          &http.Client{},
-			expectDefaultID: "legacy-token-directory",
+			expectDefaultID: "tokenlist-directory",
 		},
 	}
 
