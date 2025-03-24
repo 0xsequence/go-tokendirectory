@@ -20,6 +20,13 @@ const (
 	SourceTypeCoinGecko SourceType = "coingecko"
 )
 
+// TODO: for sequence github sources, we can make this dynamic on sync, and remove the need for this map
+// as the routes are deterministic .. we just need to expand our data structures on the actual token-directory
+// such as, providing an index of all chain names and ids, and then a list of all files, etc.
+// pretty much, this map exactly can be included in the token-directory and then we'll have a "index.json"
+//
+// in fact, we can even do that for token lists like uniswap, sushi, etc. too..
+
 // SequenceGithubSources tokenDirectorySources, order of precedence is from top to bottom, meaning
 // token info in lists higher up take precedence.
 var SequenceGithubSources = map[uint64]map[SourceType]string{

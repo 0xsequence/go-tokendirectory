@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-func NewTokenListProvider(sources []map[uint64]map[SourceType]string, httpClients ...*http.Client) Provider {
+func NewTokenListProvider(sources []map[uint64]map[SourceType]string, optHttpClient ...*http.Client) Provider {
 	var source map[uint64]map[SourceType]string
 	if len(sources) == 0 {
 		source = MergeSources(SequenceGithubSources, UniswapSources, SushiSources, CoinGeckoSources, PancakeSources)
@@ -17,12 +17,12 @@ func NewTokenListProvider(sources []map[uint64]map[SourceType]string, httpClient
 	}
 
 	httpClient := http.DefaultClient
-	if len(httpClients) > 0 {
-		httpClient = httpClients[0]
+	if len(optHttpClient) > 0 {
+		httpClient = optHttpClient[0]
 	}
 
 	return tokenListProvider{
-		id:      "legacy-token-directory",
+		id:      "tokenlist-directory",
 		client:  httpClient,
 		sources: source,
 	}
