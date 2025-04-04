@@ -43,7 +43,7 @@ func TestNewSequenceProvider(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, provider)
-				assert.Equal(t, "sequence-token-directory", provider.GetID())
+				assert.Equal(t, "sequence-builder-directory", provider.GetID())
 			}
 		})
 	}
@@ -52,7 +52,7 @@ func TestNewSequenceProvider(t *testing.T) {
 func TestSequenceProvider_GetID(t *testing.T) {
 	provider, err := NewSequenceProvider("https://example.com", nil)
 	require.NoError(t, err)
-	assert.Equal(t, "sequence-token-directory", provider.GetID())
+	assert.Equal(t, "sequence-builder-directory", provider.GetID())
 }
 
 func TestSequenceProvider_GetConfig(t *testing.T) {
