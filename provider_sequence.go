@@ -8,6 +8,7 @@ import (
 	"net/http"
 )
 
+// TODO: I believe this provider may be useless and we don't use it anywhere..?
 func NewSequenceProvider(baseURL string, client HTTPClient) (Provider, error) {
 	if len(baseURL) == 0 {
 		return nil, fmt.Errorf("baseURL is required")
@@ -18,7 +19,7 @@ func NewSequenceProvider(baseURL string, client HTTPClient) (Provider, error) {
 	}
 
 	return sequenceProvider{
-		id:      "sequence-token-directory",
+		id:      "sequence-builder-directory",
 		client:  client,
 		baseURL: baseURL,
 	}, nil

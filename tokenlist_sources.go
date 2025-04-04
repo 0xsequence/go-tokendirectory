@@ -51,12 +51,15 @@ var SequenceGithubSources = map[uint64]map[SourceType]string{
 		SourceTypeERC1155: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon-zkevm/erc1155.json",
 		SourceTypeMisc:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/polygon-zkevm/misc.json",
 	},
-	// mumbai
+	// mumbai (note: mumbai is deprecated)
 	80001: {
 		SourceTypeERC20:   "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mumbai/erc20.json",
 		SourceTypeERC721:  "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mumbai/erc721.json",
 		SourceTypeERC1155: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mumbai/erc1155.json",
 		SourceTypeMisc:    "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mumbai/misc.json",
+	},
+	80002: {
+		SourceTypeERC20: "https://raw.githubusercontent.com/0xsequence/token-directory/master/index/amoy/erc20.json",
 	},
 	// BSC
 	56: {
