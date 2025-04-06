@@ -28,31 +28,52 @@ func NewTokenDirectory(options ...Options) *TokenDirectory {
 	if opts.HTTPClient != nil {
 		client = opts.HTTPClient
 	}
-	return &TokenDirectory{options: opts, client: client}
+	return &TokenDirectory{
+		options:        opts,
+		client:         client,
+		tokenListCache: map[string]TokenList{},
+	}
 }
 
 type Options struct {
 	// HTTPClient is the HTTP client to use for fetching the token directory.
-	// The default is http.DefaultClient.
+	//
+	// Default is http.DefaultClient.
 	HTTPClient *http.Client
 
 	// ChainIDs is a list of chain IDs to fetch, acting as a filter on top of the index.
 	// If not provided, all chain IDs will be fetched.
+	//
+	// Default is nil, which means all chain IDs will be fetched.
 	ChainIDs []uint64
 
 	// SkipExternalTokenLists is a flag to skip fetching external token lists.
 	// The external token lists are external lists which are imported into
 	// the token directory.
+	//
+	// Default is false, meaning external token lists will be fetched.
 	SkipExternalTokenLists bool
 
 	// IncludeDeprecated is a flag to include deprecated token lists.
 	// If not provided, deprecated token lists will be skipped.
+	//
+	// Default is false, meaning deprecated token lists will be skipped.
 	IncludeDeprecated bool
 
 	// TokenListURLs is a list of token list URLs to fetch, acting
 	// as a filter on top of the index to only ever fetch these
 	// urls. If not provided, all token list URLs will be fetched.
+	//
+	// Default is nil, which means all token list URLs will be fetched.
 	TokenListURLs []string
+
+	// NoCache is a flag to disable the local token list cache.
+	// The cache works by checking the content hash of the Index
+	// with the content hash of the TokenList. If the content hash
+	// has changed, the TokenList will be refetched.
+	//
+	// Default is false, therefore the cache is enabled.
+	NoCache bool
 }
 
 const tokenDirectoryBaseSourceURL = "https://raw.githubusercontent.com/0xsequence/token-directory/master/index"
@@ -63,6 +84,8 @@ type TokenDirectory struct {
 
 	index          TokenDirectoryIndex
 	indexFetchedAt time.Time
+
+	tokenListCache map[string]TokenList
 
 	mu sync.Mutex
 }
@@ -83,6 +106,14 @@ type IndexFilter struct {
 }
 
 func (d *TokenDirectory) FetchIndex(ctx context.Context, optFilter ...IndexFilter) (TokenDirectoryIndex, error) {
+	index, err := d.fetchIndex(ctx, optFilter...)
+	if err != nil {
+		return nil, err
+	}
+	return maps.Clone(index), nil
+}
+
+func (d *TokenDirectory) fetchIndex(ctx context.Context, optFilter ...IndexFilter) (TokenDirectoryIndex, error) {
 	var filter *IndexFilter
 	if len(optFilter) > 0 {
 		filter = &optFilter[0]
@@ -93,9 +124,9 @@ func (d *TokenDirectory) FetchIndex(ctx context.Context, optFilter ...IndexFilte
 	d.mu.Lock()
 	indexFetchedAt := d.indexFetchedAt
 	if time.Since(indexFetchedAt) < 30*time.Second {
-		index := maps.Clone(d.index)
+		tdIndex := filteredIndex(d.index, filter)
 		d.mu.Unlock()
-		return filteredIndex(index, filter), nil
+		return tdIndex, nil
 	}
 	d.mu.Unlock()
 
@@ -181,7 +212,7 @@ func (d *TokenDirectory) FetchIndex(ctx context.Context, optFilter ...IndexFilte
 	}
 
 	d.mu.Lock()
-	d.index = maps.Clone(tdIndex)
+	d.index = tdIndex
 	d.indexFetchedAt = time.Now()
 	d.mu.Unlock()
 
@@ -199,7 +230,7 @@ type TokenDirectoryIndexEntry struct {
 }
 
 func (d *TokenDirectory) FetchChainTokenLists(ctx context.Context, chainID uint64) ([]TokenList, error) {
-	index, err := d.FetchIndex(ctx)
+	index, err := d.fetchIndex(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +255,7 @@ func (d *TokenDirectory) FetchChainTokenLists(ctx context.Context, chainID uint6
 }
 
 func (d *TokenDirectory) FetchExternalTokenLists(ctx context.Context) ([]TokenList, error) {
-	index, err := d.FetchIndex(ctx)
+	index, err := d.fetchIndex(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -253,9 +284,6 @@ func (d *TokenDirectory) FetchTokenLists(ctx context.Context, index TokenDirecto
 	for chainID, entries := range index {
 		tokenLists[chainID] = []TokenList{}
 		for _, entry := range entries {
-			// TODO: since we have our index with a content hash .. and we now fetch again
-			// it should be nice to inform if its changed since last index or not ..
-
 			tokenList, err := d.FetchTokenList(ctx, entry.TokenListURL)
 			if err != nil {
 				return nil, err
@@ -267,7 +295,7 @@ func (d *TokenDirectory) FetchTokenLists(ctx context.Context, index TokenDirecto
 }
 
 func (d *TokenDirectory) GetContentHashForTokenList(ctx context.Context, tokenListURL string) (string, bool, error) {
-	index, err := d.FetchIndex(ctx)
+	index, err := d.fetchIndex(ctx)
 	if err != nil {
 		return "", false, err
 	}
@@ -281,23 +309,8 @@ func (d *TokenDirectory) GetContentHashForTokenList(ctx context.Context, tokenLi
 	return "", false, nil
 }
 
-func (d *TokenDirectory) IsTokenListContentStale(ctx context.Context, tokenListURL string) (bool, error) {
-	index, err := d.FetchIndex(ctx)
-	if err != nil {
-		return false, err
-	}
-
-	// TODO ..... so we kinda need to store the "prev" index .. so we can check if its changed..?
-	// this endpoint will be kinda tricky...
-
-	// for _, entries := range index {
-	// 	for _, entry := range entries {
-	_ = index
-	return false, nil
-}
-
 func (d *TokenDirectory) GetChainTokenListURLs(ctx context.Context, chainID uint64) ([]string, []string, error) {
-	index, err := d.FetchIndex(ctx)
+	index, err := d.fetchIndex(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -311,7 +324,7 @@ func (d *TokenDirectory) GetChainTokenListURLs(ctx context.Context, chainID uint
 }
 
 func (d *TokenDirectory) GetExternalTokenListURLs(ctx context.Context) ([]string, []string, error) {
-	index, err := d.FetchIndex(ctx)
+	index, err := d.fetchIndex(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -325,6 +338,22 @@ func (d *TokenDirectory) GetExternalTokenListURLs(ctx context.Context) ([]string
 }
 
 func (d *TokenDirectory) FetchTokenList(ctx context.Context, tokenListURL string) (TokenList, error) {
+	if d.UseCache() {
+		d.mu.Lock()
+		tokenList, ok := d.tokenListCache[tokenListURL]
+		d.mu.Unlock()
+
+		if ok && tokenList.ContentHash != "" {
+			indexedContentHash, ok, err := d.GetContentHashForTokenList(ctx, tokenListURL)
+			if err != nil {
+				return TokenList{}, fmt.Errorf("tokendirectory: failed to get content hash for token list %s: %w", tokenListURL, err)
+			}
+			if ok && tokenList.ContentHash == indexedContentHash {
+				return tokenList, nil
+			}
+		}
+	}
+
 	req, err := http.NewRequest("GET", tokenListURL, nil)
 	if err != nil {
 		return TokenList{}, fmt.Errorf("tokendirectory: failed to create request: %w", err)
@@ -353,7 +382,7 @@ func (d *TokenDirectory) FetchTokenList(ctx context.Context, tokenListURL string
 	tokenList.ContentHash = sha256Hash(buf)
 
 	var deprecated bool
-	index, _ := d.FetchIndex(ctx)
+	index, _ := d.fetchIndex(ctx)
 	for _, entries := range index {
 		for _, entry := range entries {
 			if entry.TokenListURL == tokenListURL {
@@ -364,7 +393,17 @@ func (d *TokenDirectory) FetchTokenList(ctx context.Context, tokenListURL string
 	}
 	tokenList.Deprecated = deprecated
 
+	if d.UseCache() {
+		d.mu.Lock()
+		d.tokenListCache[tokenListURL] = tokenList
+		d.mu.Unlock()
+	}
+
 	return tokenList, nil
+}
+
+func (d *TokenDirectory) UseCache() bool {
+	return !d.options.NoCache
 }
 
 func TokenDirectoryIndexURL() string {

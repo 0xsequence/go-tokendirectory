@@ -44,6 +44,12 @@ func main() {
 	}
 	fmt.Println("=> len", len(tokenLists[1]))
 
+	tokenLists, err = td.FetchTokenLists(context.Background(), index2)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("=> len", len(tokenLists[1]))
+
 	// tokenLists, err := td.FetchChainTokenLists(context.Background(), 1)
 	// if err != nil {
 	// 	panic(err)
