@@ -164,7 +164,7 @@ func TestTokenListProvider_FetchTokenList(t *testing.T) {
 					Address:  "0x1234567890123456789012345678901234567890",
 					Name:     "Test Token",
 					Symbol:   "TST",
-					Decimals: 18,
+					Decimals: PtrTo(uint64(18)),
 				},
 			},
 		}
@@ -209,7 +209,7 @@ func TestTokenListProvider_FetchTokenList(t *testing.T) {
 				Address:  "0x1234567890123456789012345678901234567890",
 				Name:     "Test Token",
 				Symbol:   "TST",
-				Decimals: 18,
+				Decimals: PtrTo(uint64(18)),
 			},
 		}
 
@@ -329,7 +329,7 @@ func TestTokenListProvider_FetchTokenList(t *testing.T) {
 					Address:  "0x1234567890123456789012345678901234567890",
 					Name:     "Test Token",
 					Symbol:   "TST",
-					Decimals: 18,
+					Decimals: PtrTo(uint64(18)),
 				},
 			},
 		}
@@ -369,4 +369,8 @@ func TestTokenListProvider_FetchTokenList(t *testing.T) {
 		assert.Equal(t, 1, len(list.Tokens))
 		assert.Equal(t, "Test Token", list.Tokens[0].Name)
 	})
+}
+
+func PtrTo[T any](v T) *T {
+	return &v
 }

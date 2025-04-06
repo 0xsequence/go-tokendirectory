@@ -186,7 +186,7 @@ func TestTokenDirectory_updateSources(t *testing.T) {
 				Address:  "0x1234567890123456789012345678901234567890",
 				Name:     "Token 1",
 				Symbol:   "TKN1",
-				Decimals: 18,
+				Decimals: PtrTo(uint64(18)),
 			},
 		},
 	})
@@ -201,7 +201,7 @@ func TestTokenDirectory_updateSources(t *testing.T) {
 				Address:  "0xabcdef0123456789abcdef0123456789abcdef01",
 				Name:     "Token 2",
 				Symbol:   "TKN2",
-				Decimals: 18,
+				Decimals: PtrTo(uint64(18)),
 			},
 		},
 	})
@@ -238,7 +238,7 @@ func TestTokenDirectory_updateSources(t *testing.T) {
 					Address:  "0x1234567890123456789012345678901234567890",
 					Name:     "Token 1",
 					Symbol:   "TKN1",
-					Decimals: 18,
+					Decimals: PtrTo(uint64(18)),
 				},
 			},
 		})
@@ -252,7 +252,7 @@ func TestTokenDirectory_updateSources(t *testing.T) {
 					Address:  "0xabcdef0123456789abcdef0123456789abcdef01",
 					Name:     "Token 2",
 					Symbol:   "TKN2",
-					Decimals: 18,
+					Decimals: PtrTo(uint64(18)),
 				},
 			},
 		})
@@ -285,7 +285,7 @@ func TestTokenDirectory_updateSources(t *testing.T) {
 					Address:  "0x1234567890123456789012345678901234567890",
 					Name:     "Token 1",
 					Symbol:   "TKN1",
-					Decimals: 18,
+					Decimals: PtrTo(uint64(18)),
 				},
 			},
 		})
@@ -299,7 +299,7 @@ func TestTokenDirectory_updateSources(t *testing.T) {
 					Address:  "0xabcdef0123456789abcdef0123456789abcdef01",
 					Name:     "NFT 1",
 					Symbol:   "NFT1",
-					Decimals: 0,
+					Decimals: PtrTo(uint64(0)),
 				},
 			},
 		})
@@ -337,7 +337,7 @@ func TestTokenDirectory_GetContractInfo(t *testing.T) {
 				Address:  tokenAddress,
 				Name:     "Token 1",
 				Symbol:   "TKN1",
-				Decimals: 18,
+				Decimals: PtrTo(uint64(18)),
 			},
 		},
 	})
@@ -386,7 +386,7 @@ func TestTokenDirectory_GetNetworks(t *testing.T) {
 				Address:  "0x1234567890123456789012345678901234567890",
 				Name:     "Token 1",
 				Symbol:   "TKN1",
-				Decimals: 18,
+				Decimals: PtrTo(uint64(18)),
 			},
 		},
 	})
@@ -401,7 +401,7 @@ func TestTokenDirectory_GetNetworks(t *testing.T) {
 				Address:  "0xabcdef0123456789abcdef0123456789abcdef01",
 				Name:     "Token 2",
 				Symbol:   "TKN2",
-				Decimals: 18,
+				Decimals: PtrTo(uint64(18)),
 			},
 		},
 	})
@@ -437,7 +437,7 @@ func TestTokenDirectory_GetTokens(t *testing.T) {
 				Address:  "0x1234567890123456789012345678901234567890",
 				Name:     "Token 1",
 				Symbol:   "TKN1",
-				Decimals: 18,
+				Decimals: PtrTo(uint64(18)),
 			},
 		},
 	})
@@ -452,7 +452,7 @@ func TestTokenDirectory_GetTokens(t *testing.T) {
 				Address:  "0xabcdef0123456789abcdef0123456789abcdef01",
 				Name:     "NFT 1",
 				Symbol:   "NFT1",
-				Decimals: 0,
+				Decimals: PtrTo(uint64(0)),
 			},
 		},
 	})
@@ -491,7 +491,7 @@ func TestTokenDirectory_GetAllTokens(t *testing.T) {
 				Address:  "0x1234567890123456789012345678901234567890",
 				Name:     "Token 1",
 				Symbol:   "TKN1",
-				Decimals: 18,
+				Decimals: PtrTo(uint64(18)),
 			},
 		},
 	})
@@ -506,7 +506,7 @@ func TestTokenDirectory_GetAllTokens(t *testing.T) {
 				Address:  "0xabcdef0123456789abcdef0123456789abcdef01",
 				Name:     "Token 2",
 				Symbol:   "TKN2",
-				Decimals: 18,
+				Decimals: PtrTo(uint64(18)),
 			},
 		},
 	})
@@ -553,7 +553,7 @@ func TestTokenDirectory_OnUpdate(t *testing.T) {
 				Address:  "0x1234567890123456789012345678901234567890",
 				Name:     "Token 1",
 				Symbol:   "TKN1",
-				Decimals: 18,
+				Decimals: PtrTo(uint64(18)),
 			},
 		},
 	})
@@ -594,7 +594,7 @@ func TestTokenDirectory_Run(t *testing.T) {
 				Address:  "0x1234567890123456789012345678901234567890",
 				Name:     "Token 1",
 				Symbol:   "TKN1",
-				Decimals: 18,
+				Decimals: PtrTo(uint64(18)),
 			},
 		},
 	})
@@ -657,7 +657,7 @@ func TestTokenDirectory_normalizeTokens(t *testing.T) {
 				Address:  "0xAbCdEf0123456789AbCdEf0123456789AbCdEf01",
 				Name:     "Token 1",
 				Symbol:   "TKN1",
-				Decimals: 18,
+				Decimals: PtrTo(uint64(18)),
 				Extensions: ContractInfoExtension{
 					OriginAddress: "0xDeF0123456789AbCdEf0123456789AbCdEf0123",
 					Blacklist:     true,
