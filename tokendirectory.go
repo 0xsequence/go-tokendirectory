@@ -252,6 +252,19 @@ func (d *TokenDirectory) FetchChainTokenLists(ctx context.Context, chainID uint6
 	}
 
 	return tokenLists, nil
+	// index, err := d.fetchIndex(ctx, IndexFilter{ChainIDs: []uint64{chainID}})
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// out, err := d.FetchTokenLists(ctx, index)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// tokenLists, ok := out[chainID]
+	// if !ok {
+	// 	return nil, fmt.Errorf("tokendirectory: no token lists found")
+	// }
+	// return tokenLists, nil
 }
 
 func (d *TokenDirectory) FetchExternalTokenLists(ctx context.Context) ([]TokenList, error) {
@@ -277,6 +290,19 @@ func (d *TokenDirectory) FetchExternalTokenLists(ctx context.Context) ([]TokenLi
 	}
 
 	return tokenLists, nil
+	// index, err := d.fetchIndex(ctx, IndexFilter{External: true})
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// out, err := d.FetchTokenLists(ctx, index)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// tokenLists, ok := out[0]
+	// if !ok {
+	// 	return nil, fmt.Errorf("tokendirectory: no token lists found")
+	// }
+	// return tokenLists, nil
 }
 
 func (d *TokenDirectory) FetchTokenLists(ctx context.Context, index TokenDirectoryIndex) (map[uint64][]TokenList, error) {
@@ -393,6 +419,33 @@ func (d *TokenDirectory) FetchTokenList(ctx context.Context, tokenListURL string
 	}
 	tokenList.Deprecated = deprecated
 
+	// When d.Options is configured with ChainIDs, then we will filter the token lists
+	// to only include the tokens that match the chainIDs. This is handy for
+	// external token lists to avoid copying their data for chains which are not
+	// of interest.
+	if d.options.ChainIDs != nil {
+		chainIDs := d.options.ChainIDs
+		if tokenList.ChainID > 0 && !slices.Contains(chainIDs, tokenList.ChainID) {
+			// token list is not for a chain of interest, return empty set
+			tokenList.Tokens = []ContractInfo{}
+		} else if tokenList.ChainID == 0 {
+			// token list is an external token list, filter the tokens to only include
+			// the tokens that match the chainIDs
+			tokens := []ContractInfo{}
+			for _, token := range tokenList.Tokens {
+				if !slices.Contains(chainIDs, token.ChainID) {
+					continue
+				}
+				tokens = append(tokens, token)
+			}
+			tokenList.Tokens = tokens
+		} else {
+			// all is good, no need to filter
+		}
+	}
+
+	// Cache the token list if caching is enabled. Note: this will be evicted
+	// very quickly if the index is updated.
 	if d.UseCache() {
 		d.mu.Lock()
 		d.tokenListCache[tokenListURL] = tokenList

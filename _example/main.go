@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	td := tokendirectory.NewTokenDirectory() //tokendirectory.Options{ChainIDs: []uint64{1, 137}}) //, SkipExternalTokenLists: true})
+	td := tokendirectory.NewTokenDirectory(tokendirectory.Options{ChainIDs: []uint64{1, 137}}) //, SkipExternalTokenLists: true})
 	// td := tokendirectory.NewTokenDirectory(tokendirectory.Options{TokenListURLs: []string{"https://raw.githubusercontent.com/0xsequence/token-directory/master/index/mainnet/erc20.json"}})
 	// td := tokendirectory.NewTokenDirectory(tokendirectory.Options{IncludeDeprecated: true})
 	index, err := td.FetchIndex(context.Background())
@@ -32,7 +32,7 @@ func main() {
 
 	fmt.Println("----")
 
-	index2, err := td.FetchIndex(context.Background(), tokendirectory.IndexFilter{ChainIDs: []uint64{1}}) //, External: true, Deprecated: true})
+	index2, err := td.FetchIndex(context.Background()) //, tokendirectory.IndexFilter{ChainIDs: []uint64{1}}) //, External: true, Deprecated: true})
 	if err != nil {
 		panic(err)
 	}
@@ -42,7 +42,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("=> len", len(tokenLists[1]))
+	fmt.Println("=> len", len(tokenLists))
 
 	tokenLists, err = td.FetchTokenLists(context.Background(), index2)
 	if err != nil {
