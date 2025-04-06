@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"maps"
 	"net/http"
 	"slices"
 	"sort"
@@ -110,7 +109,16 @@ func (d *TokenDirectory) FetchIndex(ctx context.Context, optFilter ...IndexFilte
 	if err != nil {
 		return nil, err
 	}
-	return maps.Clone(index), nil
+
+	// Create a deep copy of the index
+	result := TokenDirectoryIndex{}
+	for chainID, entries := range index {
+		entriesCopy := make([]TokenDirectoryIndexEntry, len(entries))
+		copy(entriesCopy, entries)
+		result[chainID] = entriesCopy
+	}
+
+	return result, nil
 }
 
 func (d *TokenDirectory) fetchIndex(ctx context.Context, optFilter ...IndexFilter) (TokenDirectoryIndex, error) {
@@ -453,6 +461,57 @@ func (d *TokenDirectory) FetchTokenList(ctx context.Context, tokenListURL string
 	}
 
 	return tokenList, nil
+}
+
+// DiffIndex returns the difference between two token directory indexes, focusing on
+// what's new or changed in index2 (the newer version) compared to index1. Think
+// of index1 like the first version of the index, and index2 like the second version.
+//
+// The diff logic creates a new index containing:
+// 1. Entries that exist in index2 but not in index1 (new entries)
+// 2. Entries that exist in both but have different content hashes (changed entries)
+// In all cases, the index2 version of the entry is used in the output.
+func (d *TokenDirectory) DiffIndex(index1, index2 TokenDirectoryIndex) TokenDirectoryIndex {
+	out := TokenDirectoryIndex{}
+
+	// Check for entries in index2 that are new or different from index1
+	for chainID2, entries2 := range index2 {
+		for _, entry2 := range entries2 {
+			found := false
+			if entries1, exists := index1[chainID2]; exists {
+				for _, entry1 := range entries1 {
+					if entry2.TokenListURL == entry1.TokenListURL {
+						found = true
+						// If content hash is different, add to diff (using entry2)
+						if entry2.ContentHash != entry1.ContentHash {
+							if _, ok := out[chainID2]; !ok {
+								out[chainID2] = []TokenDirectoryIndexEntry{}
+							}
+							out[chainID2] = append(out[chainID2], entry2)
+						}
+						break
+					}
+				}
+			}
+			// If entry doesn't exist in index1, add to diff
+			if !found {
+				if _, ok := out[chainID2]; !ok {
+					out[chainID2] = []TokenDirectoryIndexEntry{}
+				}
+				out[chainID2] = append(out[chainID2], entry2)
+			}
+		}
+	}
+
+	// Sort entries for consistency
+	for chainID, entries := range out {
+		sort.Slice(entries, func(i, j int) bool {
+			return entries[i].Filename < entries[j].Filename
+		})
+		out[chainID] = entries
+	}
+
+	return out
 }
 
 func (d *TokenDirectory) UseCache() bool {
