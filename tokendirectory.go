@@ -2,312 +2,360 @@ package tokendirectory
 
 import (
 	"context"
-	"errors"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"slices"
-	"strings"
+	"sort"
 	"sync"
-	"sync/atomic"
 	"time"
-
-	"github.com/0xsequence/go-sequence/lib/prototyp"
 )
 
-func NewTokenDirectory(options ...Option) (*TokenDirectory, error) {
-	dir := &TokenDirectory{
-		providers: make(map[string]Provider),
-		lists:     make(map[uint64]map[SourceType]*TokenList),
-		contracts: make(map[uint64]map[prototyp.Hash]ContractInfo),
-	}
+const tokenDirectoryBaseSourceURL = "https://raw.githubusercontent.com/0xsequence/token-directory/master/index"
 
-	for _, option := range options {
-		if err := option(dir); err != nil {
-			return nil, err
-		}
-	}
-
-	if dir.updateInterval == 0 {
-		dir.updateInterval = time.Minute * 15
-	}
-	if len(dir.providers) == 0 {
-		seqProvider, err := NewSequenceProvider(_DefaultMetadataSource, http.DefaultClient)
-		if err != nil {
-			return nil, err
-		}
-		dir.providers = map[string]Provider{"default": seqProvider}
-	}
-	if dir.log == nil {
-		// Use a no-op logger by default
-		dir.log = slog.New(slog.NewTextHandler(io.Discard, nil))
-	}
-
-	return dir, nil
+type Provider interface {
+	FetchTokenList(ctx context.Context, url string) (TokenList, error)
 }
+
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+func TokenDirectoryIndexURL() string {
+	return fmt.Sprintf("%s/index.json", tokenDirectoryBaseSourceURL)
+}
+
+func TokenDirectoryTokenListURL(group string, file string) string {
+	return fmt.Sprintf("%s/%s/%s", tokenDirectoryBaseSourceURL, group, file)
+}
+
+// func NewTokenListProvider(sourceURLs []string) (Provider, error) {
+// 	if len(sourceURLs) == 0 {
+// 		return nil, fmt.Errorf("no source URLs provided")
+// 	}
+// 	return &tokenListProvider{sourceURLs: sourceURLs}, nil
+// }
+
+// type tokenListProvider struct {
+// 	client     *http.Client // TODO
+// 	sourceURLs []string
+// }
+
+// var _ Provider = &tokenListProvider{}
+
+// func (p *tokenListProvider) FetchTokenList(ctx context.Context, url string) (*TokenList, error) {
+// 	return nil, nil
+// }
+
+//--
 
 type TokenDirectory struct {
-	log       *slog.Logger
-	providers map[string]Provider
-	lists     map[uint64]map[SourceType]*TokenList
+	options Options
+	client  *http.Client
 
-	contracts   map[uint64]map[prototyp.Hash]ContractInfo
-	contractsMu sync.RWMutex
+	index          TokenDirectoryIndex
+	indexFetchedAt time.Time
 
-	updateInterval time.Duration
-	onUpdate       []OnUpdateFunc
-	updateMu       sync.Mutex
-
-	chainIDs []uint64
-	sources  []SourceType
-
-	ctx     context.Context
-	ctxStop context.CancelFunc
-	running int32
+	mu sync.Mutex
 }
 
-type OnUpdateFunc func(ctx context.Context, chainID uint64, contractInfoList []ContractInfo)
+// TODO: we can add a filter by chainID ..
+// TODO: we can add filter to include external or not ..
 
-// Run starts the token directory fetcher. This method will block and poll in the current
-// go-routine. You'll be responsible for calling the Run method in your own gorutine.
-func (t *TokenDirectory) Run(ctx context.Context) error {
-	if t.IsRunning() {
-		return fmt.Errorf("tokendirectory: already running")
+type Options struct {
+	// HTTPClient is the HTTP client to use for fetching the token directory.
+	// The default is http.DefaultClient.
+	HTTPClient *http.Client
+
+	// ChainIDs is a list of chain IDs to fetch, acting as a filter on top of the index.
+	// If not provided, all chain IDs will be fetched.
+	ChainIDs []uint64
+
+	// SkipExternalTokenLists is a flag to skip fetching external token lists.
+	// The external token lists are external lists which are imported into
+	// the token directory.
+	SkipExternalTokenLists bool
+
+	// IncludeDeprecated is a flag to include deprecated token lists.
+	// If not provided, deprecated token lists will be skipped.
+	IncludeDeprecated bool
+
+	// TokenListURLs is a list of token list URLs to fetch, acting
+	// as a filter on top of the index to only ever fetch these
+	// urls. If not provided, all token list URLs will be fetched.
+	TokenListURLs []string
+}
+
+// TODO: we can limit to only some number of chainIds ..
+// or pass nil for all.. or just have it in Options.ChainIDs []uint64 ..
+
+func NewTokenDirectory(options ...Options) *TokenDirectory {
+	opts := Options{}
+	if len(options) > 0 {
+		opts = options[0]
+	}
+	client := http.DefaultClient
+	if opts.HTTPClient != nil {
+		client = opts.HTTPClient
+	}
+	return &TokenDirectory{options: opts, client: client}
+}
+
+// TODO: .. so lets track the last time we watched the index .. and lets
+// set option that we will only re-fetch every X time..
+
+type IndexFilter struct {
+	ChainIDs []uint64
+	External bool
+}
+
+// TODO: add optFilter ...IndexFilter
+func (d *TokenDirectory) FetchIndex(ctx context.Context, optFilter ...IndexFilter) (TokenDirectoryIndex, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	filter := IndexFilter{}
+	if len(optFilter) > 0 {
+		filter = optFilter[0]
+	}
+	_ = filter
+
+	// TODO .....
+
+	if time.Since(d.indexFetchedAt) < 30*time.Second {
+		fmt.Println("serving here")
+		return d.index, nil
+	}
+	fmt.Println("fetching index")
+
+	req, err := http.NewRequest("GET", TokenDirectoryIndexURL(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("tokendirectory: creating request: %w", err)
+	}
+	res, err := d.client.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, fmt.Errorf("tokendirectory: fetching index.json: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("tokendirectory: fetching index.json: %s", res.Status)
 	}
 
-	t.ctx, t.ctxStop = context.WithCancel(ctx)
-
-	atomic.StoreInt32(&t.running, 1)
-	defer atomic.StoreInt32(&t.running, 0)
-
-	// Initial source fetch
-	if err := t.updateSources(t.ctx); err != nil {
-		return fmt.Errorf("initial source fetch: %w", err)
+	buf, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("tokendirectory: reading index.jsonbody: %w", err)
 	}
 
-	// Fetch on interval
-	for {
-		select {
-		case <-t.ctx.Done():
-			return nil
-		case <-time.After(t.updateInterval):
-			if err := t.updateSources(t.ctx); err != nil {
-				t.log.Error("failed to update sources", slog.Any("err", err))
-				// Continue running despite errors
-			}
+	var indexFile struct {
+		Index map[string]struct {
+			ChainID    uint64            `json:"chainId"`
+			Deprecated bool              `json:"deprecated"`
+			TokenLists map[string]string `json:"tokenLists"`
+		} `json:"index"`
+	}
+
+	if err := json.Unmarshal(buf, &indexFile); err != nil {
+		return nil, fmt.Errorf("tokendirectory: unmarshalling index.json: %w", err)
+	}
+
+	tdIndex := TokenDirectoryIndex{}
+
+	for name, group := range indexFile.Index {
+		if d.options.SkipExternalTokenLists && name == "_external" {
+			continue // skipping for now + will add option later
 		}
-	}
-}
 
-func (t *TokenDirectory) Stop() {
-	t.log.Info("tokendirectory: stop")
-	t.ctxStop()
-}
+		chainID := group.ChainID
+		deprecated := group.Deprecated
+		tokenLists := group.TokenLists
 
-func (t *TokenDirectory) IsRunning() bool {
-	return atomic.LoadInt32(&t.running) == 1
-}
-
-func (t *TokenDirectory) updateSources(ctx context.Context) error {
-	wg := &sync.WaitGroup{}
-	for _, provider := range t.providers {
-		chainIDs, sources, err := provider.GetConfig(ctx)
-		if err != nil {
-			return fmt.Errorf("get config: %w", err)
+		if name != "_external" && chainID == 0 {
+			// extra sanity check, even though the index should never produce this
+			// TODO: we could log the error too
+			// err := fmt.Errorf("tokendirectory: index chainId is 0 for %s", name)
+			continue
 		}
-		for _, chainID := range chainIDs {
-			if len(t.chainIDs) > 0 && !slices.Contains(t.chainIDs, chainID) {
+
+		if chainID > 0 && len(d.options.ChainIDs) > 0 && !slices.Contains(d.options.ChainIDs, chainID) {
+			continue
+		}
+
+		if !d.options.IncludeDeprecated && deprecated {
+			continue
+		}
+
+		for file, hash := range tokenLists {
+			tokenListURL := TokenDirectoryTokenListURL(name, file)
+			if len(d.options.TokenListURLs) > 0 && !slices.Contains(d.options.TokenListURLs, tokenListURL) {
 				continue
 			}
-			for _, source := range sources {
-				if len(t.sources) > 0 && !slices.Contains(t.sources, source) {
-					continue
-				}
-				wg.Add(1)
-				go func(provider Provider, chainID uint64, source SourceType) {
-					defer wg.Done()
-					t.updateProvider(ctx, provider, chainID, source)
-				}(provider, chainID, source)
+
+			if _, ok := tdIndex[chainID]; !ok {
+				tdIndex[chainID] = []TokenDirectoryIndexEntry{}
+			}
+
+			tdIndex[chainID] = append(tdIndex[chainID], TokenDirectoryIndexEntry{
+				ChainID:      chainID,
+				Deprecated:   deprecated,
+				Filename:     file,
+				ContentHash:  hash,
+				TokenListURL: tokenListURL,
+			})
+		}
+
+		sort.Slice(tdIndex[chainID], func(i, j int) bool {
+			return tdIndex[chainID][i].Filename < tdIndex[chainID][j].Filename
+		})
+	}
+
+	d.index = tdIndex
+	d.indexFetchedAt = time.Now()
+
+	return tdIndex, nil
+}
+
+type TokenDirectoryIndex map[uint64][]TokenDirectoryIndexEntry
+
+type TokenDirectoryIndexEntry struct {
+	ChainID      uint64
+	Deprecated   bool
+	Filename     string
+	ContentHash  string
+	TokenListURL string
+}
+
+func (d *TokenDirectory) GetContentHashForTokenList(ctx context.Context, tokenListURL string) (string, bool, error) {
+	index, err := d.FetchIndex(ctx)
+	if err != nil {
+		return "", false, err
+	}
+
+	for _, entries := range index {
+		for _, entry := range entries {
+			if entry.TokenListURL == tokenListURL {
+				return entry.ContentHash, true, nil
 			}
 		}
 	}
-	wg.Wait()
-	return nil
+
+	return "", false, nil
 }
 
-func (t *TokenDirectory) updateProvider(ctx context.Context, provider Provider, chainID uint64, source SourceType) {
-	t.updateMu.Lock()
-	var err error
-	defer func() {
-		t.updateMu.Unlock()
-		if t.log != nil {
-			logger := t.log.With(
-				slog.String("provider", provider.GetID()),
-				slog.Uint64("chainId", chainID),
-				slog.String("source", source.String()),
-			)
+func (d *TokenDirectory) FetchChainTokenLists(ctx context.Context, chainID uint64) ([]TokenList, error) {
+	index, err := d.FetchIndex(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenLists := []TokenList{}
+
+	for indexChainID, indexEntries := range index {
+		if indexChainID != chainID {
+			continue
+		}
+
+		for _, entry := range indexEntries {
+			tokenList, err := d.FetchTokenList(ctx, entry.TokenListURL)
 			if err != nil {
-				logger.Error("failed to update provider", slog.Any("err", err))
-				return
+				return nil, err
 			}
-			logger.Debug("updated provider")
+			tokenLists = append(tokenLists, tokenList)
 		}
-	}()
-
-	// Initialize maps if they don't exist
-	t.ensureMapsInitialized(chainID)
-
-	// Fetch token list
-	tokenList, err := provider.FetchTokenList(ctx, chainID, source)
-	if err != nil || tokenList == nil {
-		return
 	}
-	normalizeTokens(provider, tokenList)
 
-	t.lists[chainID][source] = tokenList
-
-	// Process and store tokens
-	updatedContractInfo := t.processTokenList(chainID, tokenList)
-
-	// Trigger update callbacks
-	t.triggerUpdateCallbacks(ctx, chainID, updatedContractInfo)
+	return tokenLists, nil
 }
 
-// ensureMapsInitialized ensures the maps for a chain ID are initialized
-func (t *TokenDirectory) ensureMapsInitialized(chainID uint64) {
-	t.contractsMu.Lock()
-	defer t.contractsMu.Unlock()
-
-	if _, ok := t.lists[chainID]; !ok {
-		t.lists[chainID] = make(map[SourceType]*TokenList)
+func (d *TokenDirectory) FetchExternalTokenLists(ctx context.Context) ([]TokenList, error) {
+	index, err := d.FetchIndex(ctx)
+	if err != nil {
+		return nil, err
 	}
-	if _, ok := t.contracts[chainID]; !ok {
-		t.contracts[chainID] = make(map[prototyp.Hash]ContractInfo)
-	}
-}
 
-// processTokenList processes the token list and stores tokens in the contract map
-func (t *TokenDirectory) processTokenList(chainID uint64, tokenList *TokenList) []ContractInfo {
-	updatedContractInfo := []ContractInfo{}
-	seen := map[string]struct{}{}
+	tokenLists := []TokenList{}
 
-	for _, token := range tokenList.Tokens {
-		if !t.isValidToken(token, chainID) {
+	for indexChainID, indexEntries := range index {
+		if indexChainID != 0 {
 			continue
 		}
 
-		if token.Type == "" {
-			token.Type = strings.ToUpper(tokenList.TokenStandard)
-		}
-
-		token.Address = strings.ToLower(token.Address)
-
-		if _, ok := seen[token.Address]; ok {
-			// do not overwrite tokens that belong to a previous list
-			continue
-		}
-
-		// keep track of contract info which has been updated
-		if t.onUpdate != nil {
-			updatedContractInfo = append(updatedContractInfo, token)
-		}
-
-		t.contractsMu.Lock()
-		t.contracts[chainID][prototyp.HashFromString(token.Address)] = token
-		t.contractsMu.Unlock()
-		seen[token.Address] = struct{}{}
-	}
-
-	return updatedContractInfo
-}
-
-// isValidToken checks if a token is valid for inclusion
-func (t *TokenDirectory) isValidToken(token ContractInfo, chainID uint64) bool {
-	return token.Name != "" && token.Address != "" && token.ChainID == chainID
-}
-
-// triggerUpdateCallbacks triggers the registered update callbacks
-func (t *TokenDirectory) triggerUpdateCallbacks(ctx context.Context, chainID uint64, updatedContractInfo []ContractInfo) {
-	if t.onUpdate != nil && len(updatedContractInfo) > 0 {
-		for i := range t.onUpdate {
-			go t.onUpdate[i](ctx, chainID, updatedContractInfo)
+		for _, entry := range indexEntries {
+			tokenList, err := d.FetchTokenList(ctx, entry.TokenListURL)
+			if err != nil {
+				return nil, err
+			}
+			tokenLists = append(tokenLists, tokenList)
 		}
 	}
+
+	return tokenLists, nil
 }
 
-func (t *TokenDirectory) GetContractInfo(ctx context.Context, chainId uint64, contractAddr prototyp.Hash) (ContractInfo, bool, error) {
-	if _, ok := t.contracts[chainId]; !ok {
-		return ContractInfo{}, false, fmt.Errorf("chain ID not supported: %v", chainId)
+func (d *TokenDirectory) GetChainTokenListURLs(ctx context.Context, chainID uint64) ([]string, error) {
+	index, err := d.FetchIndex(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	t.contractsMu.RLock()
-	defer t.contractsMu.RUnlock()
-
-	if info, ok := t.contracts[chainId][contractAddr]; ok {
-		return info, true, nil
+	urls := []string{}
+	for _, entry := range index[chainID] {
+		urls = append(urls, entry.TokenListURL)
 	}
-
-	return ContractInfo{}, false, errors.New("contract not found")
+	return urls, nil
 }
 
-func (t *TokenDirectory) GetNetworks(ctx context.Context) ([]uint64, error) {
-	t.contractsMu.RLock()
-	defer t.contractsMu.RUnlock()
-
-	var chainIDs []uint64
-	for chainID := range t.contracts {
-		chainIDs = append(chainIDs, chainID)
+// TODO: maybe we pass optional, "lastContentHash", so if this is it, we skip ..
+func (d *TokenDirectory) FetchTokenList(ctx context.Context, tokenListURL string) (TokenList, error) {
+	req, err := http.NewRequest("GET", tokenListURL, nil)
+	if err != nil {
+		return TokenList{}, fmt.Errorf("tokendirectory: failed to create request: %w", err)
 	}
-	return chainIDs, nil
-}
+	res, err := d.client.Do(req.WithContext(ctx))
+	if err != nil {
+		return TokenList{}, fmt.Errorf("tokendirectory: failed to fetch token list %s: %w", tokenListURL, err)
+	}
+	defer res.Body.Close()
 
-func (t *TokenDirectory) GetAllTokens(ctx context.Context) ([]ContractInfo, error) {
-	t.contractsMu.RLock()
-
-	// Get all chain IDs first
-	var chainIDs []uint64
-	for chainID := range t.contracts {
-		chainIDs = append(chainIDs, chainID)
+	if res.StatusCode != http.StatusOK {
+		return TokenList{}, fmt.Errorf("tokendirectory: failed to fetch token list %s", tokenListURL)
 	}
 
-	t.contractsMu.RUnlock()
+	buf, err := io.ReadAll(res.Body)
+	if err != nil {
+		return TokenList{}, fmt.Errorf("tokendirectory: failed to read token list %s: %w", tokenListURL, err)
+	}
 
-	// Now fetch tokens for each chain ID using GetTokens which has its own locking
-	var tokens []ContractInfo
-	for _, chainID := range chainIDs {
-		list, err := t.GetTokens(ctx, chainID)
-		if err != nil {
-			return nil, err
+	var tokenList TokenList
+	if err := json.Unmarshal(buf, &tokenList); err != nil {
+		return TokenList{}, fmt.Errorf("tokendirectory: failed to unmarshal token list %s: %w", tokenListURL, err)
+	}
+
+	tokenList.TokenListURL = tokenListURL
+	tokenList.ContentHash = sha256Hash(buf)
+
+	var deprecated bool
+	index, _ := d.FetchIndex(ctx)
+	for _, entries := range index {
+		for _, entry := range entries {
+			if entry.TokenListURL == tokenListURL {
+				deprecated = entry.Deprecated
+				break
+			}
 		}
-		tokens = append(tokens, list...)
 	}
+	tokenList.Deprecated = deprecated
 
-	return tokens, nil
+	return tokenList, nil
 }
 
-func (t *TokenDirectory) GetTokens(ctx context.Context, chainID uint64) ([]ContractInfo, error) {
-	t.contractsMu.RLock()
-	defer t.contractsMu.RUnlock()
+// TODO: keep track of sourceURL and their hash .. we can keep track of it in memory
+// .. we can also say, forceFetch ..
 
-	if _, ok := t.contracts[chainID]; !ok {
-		return []ContractInfo{}, nil
-	}
-	tokens := make([]ContractInfo, 0, len(t.contracts[chainID]))
-	for _, token := range t.contracts[chainID] {
-		tokens = append(tokens, token)
-	}
-	return tokens, nil
-}
-
-func normalizeTokens(provider Provider, tokenList *TokenList) {
-	// normalize addresses
-	for i, info := range tokenList.Tokens {
-		tokenList.Tokens[i].Address = strings.ToLower(info.Address)
-		tokenList.Tokens[i].Extensions.OriginAddress = strings.ToLower(info.Extensions.OriginAddress)
-		tokenList.Tokens[i].Type = strings.ToUpper(tokenList.TokenStandard)
-		// add the provider verification stamp
-		tokenList.Tokens[i].Extensions.Verified = !info.Extensions.Blacklist
-		tokenList.Tokens[i].Extensions.VerifiedBy = provider.GetID()
-	}
+func sha256Hash(data []byte) string {
+	h := sha256.New()
+	h.Write(data)
+	return hex.EncodeToString(h.Sum(nil))
 }
