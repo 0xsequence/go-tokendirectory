@@ -13,7 +13,7 @@ type TokenList struct {
 	Tokens        []ContractInfo `json:"tokens"`
 	Version       interface{}    `json:"version"`
 
-	// ...
+	// Fields for internal use as represented in the master index.json
 	TokenListURL string `json:"-"`
 	ContentHash  string `json:"-"`
 	Deprecated   bool   `json:"-"`

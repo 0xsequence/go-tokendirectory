@@ -16,42 +16,6 @@ import (
 
 const tokenDirectoryBaseSourceURL = "https://raw.githubusercontent.com/0xsequence/token-directory/master/index"
 
-type Provider interface {
-	FetchTokenList(ctx context.Context, url string) (TokenList, error)
-}
-
-type HTTPClient interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
-func TokenDirectoryIndexURL() string {
-	return fmt.Sprintf("%s/index.json", tokenDirectoryBaseSourceURL)
-}
-
-func TokenDirectoryTokenListURL(group string, file string) string {
-	return fmt.Sprintf("%s/%s/%s", tokenDirectoryBaseSourceURL, group, file)
-}
-
-// func NewTokenListProvider(sourceURLs []string) (Provider, error) {
-// 	if len(sourceURLs) == 0 {
-// 		return nil, fmt.Errorf("no source URLs provided")
-// 	}
-// 	return &tokenListProvider{sourceURLs: sourceURLs}, nil
-// }
-
-// type tokenListProvider struct {
-// 	client     *http.Client // TODO
-// 	sourceURLs []string
-// }
-
-// var _ Provider = &tokenListProvider{}
-
-// func (p *tokenListProvider) FetchTokenList(ctx context.Context, url string) (*TokenList, error) {
-// 	return nil, nil
-// }
-
-//--
-
 type TokenDirectory struct {
 	options Options
 	client  *http.Client
@@ -61,9 +25,6 @@ type TokenDirectory struct {
 
 	mu sync.Mutex
 }
-
-// TODO: we can add a filter by chainID ..
-// TODO: we can add filter to include external or not ..
 
 type Options struct {
 	// HTTPClient is the HTTP client to use for fetching the token directory.
@@ -89,9 +50,10 @@ type Options struct {
 	TokenListURLs []string
 }
 
-// TODO: we can limit to only some number of chainIds ..
-// or pass nil for all.. or just have it in Options.ChainIDs []uint64 ..
-
+// NewTokenDirectory creates a new TokenDirectory instance which provides
+// access to the token directory index and token lists. By default with
+// no custom options, it will fetch all chains, all external token lists,
+// but will skip deprecated chain token lists.
 func NewTokenDirectory(options ...Options) *TokenDirectory {
 	opts := Options{}
 	if len(options) > 0 {
@@ -104,15 +66,21 @@ func NewTokenDirectory(options ...Options) *TokenDirectory {
 	return &TokenDirectory{options: opts, client: client}
 }
 
-// TODO: .. so lets track the last time we watched the index .. and lets
-// set option that we will only re-fetch every X time..
-
 type IndexFilter struct {
+	// All flag will return everything, aka no filtering.
+	All bool
+
+	// ChainIDs flag will return just the specific chains.
 	ChainIDs []uint64
+
+	// External flag will return just the external token lists
+	// aka, chainID 0.
 	External bool
+
+	// Deprecated flag will return just the deprecated token lists.
+	Deprecated bool
 }
 
-// TODO: add optFilter ...IndexFilter
 func (d *TokenDirectory) FetchIndex(ctx context.Context, optFilter ...IndexFilter) (TokenDirectoryIndex, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -121,13 +89,10 @@ func (d *TokenDirectory) FetchIndex(ctx context.Context, optFilter ...IndexFilte
 	if len(optFilter) > 0 {
 		filter = optFilter[0]
 	}
-	_ = filter
-
-	// TODO .....
 
 	if time.Since(d.indexFetchedAt) < 30*time.Second {
 		fmt.Println("serving here")
-		return d.index, nil
+		return filteredIndex(d.index, filter), nil
 	}
 	fmt.Println("fetching index")
 
@@ -166,7 +131,7 @@ func (d *TokenDirectory) FetchIndex(ctx context.Context, optFilter ...IndexFilte
 
 	for name, group := range indexFile.Index {
 		if d.options.SkipExternalTokenLists && name == "_external" {
-			continue // skipping for now + will add option later
+			continue
 		}
 
 		chainID := group.ChainID
@@ -215,7 +180,7 @@ func (d *TokenDirectory) FetchIndex(ctx context.Context, optFilter ...IndexFilte
 	d.index = tdIndex
 	d.indexFetchedAt = time.Now()
 
-	return tdIndex, nil
+	return filteredIndex(tdIndex, filter), nil
 }
 
 type TokenDirectoryIndex map[uint64][]TokenDirectoryIndexEntry
@@ -233,7 +198,6 @@ func (d *TokenDirectory) GetContentHashForTokenList(ctx context.Context, tokenLi
 	if err != nil {
 		return "", false, err
 	}
-
 	for _, entries := range index {
 		for _, entry := range entries {
 			if entry.TokenListURL == tokenListURL {
@@ -241,8 +205,11 @@ func (d *TokenDirectory) GetContentHashForTokenList(ctx context.Context, tokenLi
 			}
 		}
 	}
-
 	return "", false, nil
+}
+
+func (d *TokenDirectory) FetchTokenLists(ctx context.Context, index TokenDirectoryIndex) (map[uint64][]TokenList, error) {
+	return nil, nil
 }
 
 func (d *TokenDirectory) FetchChainTokenLists(ctx context.Context, chainID uint64) ([]TokenList, error) {
@@ -351,8 +318,43 @@ func (d *TokenDirectory) FetchTokenList(ctx context.Context, tokenListURL string
 	return tokenList, nil
 }
 
-// TODO: keep track of sourceURL and their hash .. we can keep track of it in memory
-// .. we can also say, forceFetch ..
+func TokenDirectoryIndexURL() string {
+	return fmt.Sprintf("%s/index.json", tokenDirectoryBaseSourceURL)
+}
+
+func TokenDirectoryTokenListURL(group string, file string) string {
+	return fmt.Sprintf("%s/%s/%s", tokenDirectoryBaseSourceURL, group, file)
+}
+
+func filteredIndex(index TokenDirectoryIndex, filter IndexFilter) TokenDirectoryIndex {
+	out := TokenDirectoryIndex{}
+	if filter.All {
+		return index
+	}
+	if len(filter.ChainIDs) > 0 {
+		for _, chainID := range filter.ChainIDs {
+			out[chainID] = index[chainID]
+		}
+	}
+	if filter.External {
+		out[0] = index[0]
+	}
+	if filter.Deprecated {
+		for chainID, entries := range index {
+			deprecated := false
+			for _, entry := range entries {
+				if entry.Deprecated {
+					deprecated = true
+					break
+				}
+			}
+			if deprecated {
+				out[chainID] = entries
+			}
+		}
+	}
+	return out
+}
 
 func sha256Hash(data []byte) string {
 	h := sha256.New()
