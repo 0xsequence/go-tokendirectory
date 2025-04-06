@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/0xsequence/go-tokendirectory"
 	"github.com/davecgh/go-spew/spew"
@@ -29,11 +30,19 @@ func main() {
 
 	//--
 
-	index2, err := td.FetchIndex(context.Background(), tokendirectory.IndexFilter{ChainIDs: []uint64{1}, External: true, Deprecated: true})
+	fmt.Println("----")
+
+	index2, err := td.FetchIndex(context.Background(), tokendirectory.IndexFilter{ChainIDs: []uint64{1}}) //, External: true, Deprecated: true})
 	if err != nil {
 		panic(err)
 	}
 	spew.Dump(index2)
+
+	tokenLists, err := td.FetchTokenLists(context.Background(), index2)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("=> len", len(tokenLists[1]))
 
 	// tokenLists, err := td.FetchChainTokenLists(context.Background(), 1)
 	// if err != nil {

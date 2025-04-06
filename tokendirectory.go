@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"slices"
 	"sort"
@@ -14,16 +15,20 @@ import (
 	"time"
 )
 
-const tokenDirectoryBaseSourceURL = "https://raw.githubusercontent.com/0xsequence/token-directory/master/index"
-
-type TokenDirectory struct {
-	options Options
-	client  *http.Client
-
-	index          TokenDirectoryIndex
-	indexFetchedAt time.Time
-
-	mu sync.Mutex
+// NewTokenDirectory creates a new TokenDirectory instance which provides
+// access to the token directory index and token lists. By default with
+// no custom options, it will fetch all chains, all external token lists,
+// but will skip deprecated chain token lists.
+func NewTokenDirectory(options ...Options) *TokenDirectory {
+	opts := Options{}
+	if len(options) > 0 {
+		opts = options[0]
+	}
+	client := http.DefaultClient
+	if opts.HTTPClient != nil {
+		client = opts.HTTPClient
+	}
+	return &TokenDirectory{options: opts, client: client}
 }
 
 type Options struct {
@@ -50,20 +55,16 @@ type Options struct {
 	TokenListURLs []string
 }
 
-// NewTokenDirectory creates a new TokenDirectory instance which provides
-// access to the token directory index and token lists. By default with
-// no custom options, it will fetch all chains, all external token lists,
-// but will skip deprecated chain token lists.
-func NewTokenDirectory(options ...Options) *TokenDirectory {
-	opts := Options{}
-	if len(options) > 0 {
-		opts = options[0]
-	}
-	client := http.DefaultClient
-	if opts.HTTPClient != nil {
-		client = opts.HTTPClient
-	}
-	return &TokenDirectory{options: opts, client: client}
+const tokenDirectoryBaseSourceURL = "https://raw.githubusercontent.com/0xsequence/token-directory/master/index"
+
+type TokenDirectory struct {
+	options Options
+	client  *http.Client
+
+	index          TokenDirectoryIndex
+	indexFetchedAt time.Time
+
+	mu sync.Mutex
 }
 
 type IndexFilter struct {
@@ -82,19 +83,21 @@ type IndexFilter struct {
 }
 
 func (d *TokenDirectory) FetchIndex(ctx context.Context, optFilter ...IndexFilter) (TokenDirectoryIndex, error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	filter := IndexFilter{}
+	var filter *IndexFilter
 	if len(optFilter) > 0 {
-		filter = optFilter[0]
+		filter = &optFilter[0]
 	}
 
-	if time.Since(d.indexFetchedAt) < 30*time.Second {
-		fmt.Println("serving here")
-		return filteredIndex(d.index, filter), nil
+	// we memoize the index for 30 seconds to refrain from fetching from
+	// the remote source too often.
+	d.mu.Lock()
+	indexFetchedAt := d.indexFetchedAt
+	if time.Since(indexFetchedAt) < 30*time.Second {
+		index := maps.Clone(d.index)
+		d.mu.Unlock()
+		return filteredIndex(index, filter), nil
 	}
-	fmt.Println("fetching index")
+	d.mu.Unlock()
 
 	req, err := http.NewRequest("GET", TokenDirectoryIndexURL(), nil)
 	if err != nil {
@@ -177,8 +180,10 @@ func (d *TokenDirectory) FetchIndex(ctx context.Context, optFilter ...IndexFilte
 		})
 	}
 
-	d.index = tdIndex
+	d.mu.Lock()
+	d.index = maps.Clone(tdIndex)
 	d.indexFetchedAt = time.Now()
+	d.mu.Unlock()
 
 	return filteredIndex(tdIndex, filter), nil
 }
@@ -191,25 +196,6 @@ type TokenDirectoryIndexEntry struct {
 	Filename     string
 	ContentHash  string
 	TokenListURL string
-}
-
-func (d *TokenDirectory) GetContentHashForTokenList(ctx context.Context, tokenListURL string) (string, bool, error) {
-	index, err := d.FetchIndex(ctx)
-	if err != nil {
-		return "", false, err
-	}
-	for _, entries := range index {
-		for _, entry := range entries {
-			if entry.TokenListURL == tokenListURL {
-				return entry.ContentHash, true, nil
-			}
-		}
-	}
-	return "", false, nil
-}
-
-func (d *TokenDirectory) FetchTokenLists(ctx context.Context, index TokenDirectoryIndex) (map[uint64][]TokenList, error) {
-	return nil, nil
 }
 
 func (d *TokenDirectory) FetchChainTokenLists(ctx context.Context, chainID uint64) ([]TokenList, error) {
@@ -262,19 +248,82 @@ func (d *TokenDirectory) FetchExternalTokenLists(ctx context.Context) ([]TokenLi
 	return tokenLists, nil
 }
 
-func (d *TokenDirectory) GetChainTokenListURLs(ctx context.Context, chainID uint64) ([]string, error) {
-	index, err := d.FetchIndex(ctx)
-	if err != nil {
-		return nil, err
+func (d *TokenDirectory) FetchTokenLists(ctx context.Context, index TokenDirectoryIndex) (map[uint64][]TokenList, error) {
+	tokenLists := map[uint64][]TokenList{}
+	for chainID, entries := range index {
+		tokenLists[chainID] = []TokenList{}
+		for _, entry := range entries {
+			// TODO: since we have our index with a content hash .. and we now fetch again
+			// it should be nice to inform if its changed since last index or not ..
+
+			tokenList, err := d.FetchTokenList(ctx, entry.TokenListURL)
+			if err != nil {
+				return nil, err
+			}
+			tokenLists[chainID] = append(tokenLists[chainID], tokenList)
+		}
 	}
-	urls := []string{}
-	for _, entry := range index[chainID] {
-		urls = append(urls, entry.TokenListURL)
-	}
-	return urls, nil
+	return tokenLists, nil
 }
 
-// TODO: maybe we pass optional, "lastContentHash", so if this is it, we skip ..
+func (d *TokenDirectory) GetContentHashForTokenList(ctx context.Context, tokenListURL string) (string, bool, error) {
+	index, err := d.FetchIndex(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	for _, entries := range index {
+		for _, entry := range entries {
+			if entry.TokenListURL == tokenListURL {
+				return entry.ContentHash, true, nil
+			}
+		}
+	}
+	return "", false, nil
+}
+
+func (d *TokenDirectory) IsTokenListContentStale(ctx context.Context, tokenListURL string) (bool, error) {
+	index, err := d.FetchIndex(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	// TODO ..... so we kinda need to store the "prev" index .. so we can check if its changed..?
+	// this endpoint will be kinda tricky...
+
+	// for _, entries := range index {
+	// 	for _, entry := range entries {
+	_ = index
+	return false, nil
+}
+
+func (d *TokenDirectory) GetChainTokenListURLs(ctx context.Context, chainID uint64) ([]string, []string, error) {
+	index, err := d.FetchIndex(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	urls := []string{}
+	hashes := []string{}
+	for _, entry := range index[chainID] {
+		urls = append(urls, entry.TokenListURL)
+		hashes = append(hashes, entry.ContentHash)
+	}
+	return urls, hashes, nil
+}
+
+func (d *TokenDirectory) GetExternalTokenListURLs(ctx context.Context) ([]string, []string, error) {
+	index, err := d.FetchIndex(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	urls := []string{}
+	hashes := []string{}
+	for _, entry := range index[0] {
+		urls = append(urls, entry.TokenListURL)
+		hashes = append(hashes, entry.ContentHash)
+	}
+	return urls, hashes, nil
+}
+
 func (d *TokenDirectory) FetchTokenList(ctx context.Context, tokenListURL string) (TokenList, error) {
 	req, err := http.NewRequest("GET", tokenListURL, nil)
 	if err != nil {
@@ -326,11 +375,13 @@ func TokenDirectoryTokenListURL(group string, file string) string {
 	return fmt.Sprintf("%s/%s/%s", tokenDirectoryBaseSourceURL, group, file)
 }
 
-func filteredIndex(index TokenDirectoryIndex, filter IndexFilter) TokenDirectoryIndex {
-	out := TokenDirectoryIndex{}
-	if filter.All {
+func filteredIndex(index TokenDirectoryIndex, filter *IndexFilter) TokenDirectoryIndex {
+	if filter == nil || filter.All {
 		return index
 	}
+
+	out := TokenDirectoryIndex{}
+
 	if len(filter.ChainIDs) > 0 {
 		for _, chainID := range filter.ChainIDs {
 			out[chainID] = index[chainID]
