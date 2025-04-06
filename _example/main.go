@@ -46,6 +46,6 @@ func main() {
 
 	fmt.Println("DIFF:")
 
-	diff := td.DiffIndex(index, index2)
+	diff := tokendirectory.DiffIndex(index, index2)
 	spew.Dump(diff)
 }

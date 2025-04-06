@@ -463,6 +463,10 @@ func (d *TokenDirectory) FetchTokenList(ctx context.Context, tokenListURL string
 	return tokenList, nil
 }
 
+func (d *TokenDirectory) UseCache() bool {
+	return !d.options.NoCache
+}
+
 // DiffIndex returns the difference between two token directory indexes, focusing on
 // what's new or changed in index2 (the newer version) compared to index1. Think
 // of index1 like the first version of the index, and index2 like the second version.
@@ -471,7 +475,13 @@ func (d *TokenDirectory) FetchTokenList(ctx context.Context, tokenListURL string
 // 1. Entries that exist in index2 but not in index1 (new entries)
 // 2. Entries that exist in both but have different content hashes (changed entries)
 // In all cases, the index2 version of the entry is used in the output.
-func (d *TokenDirectory) DiffIndex(index1, index2 TokenDirectoryIndex) TokenDirectoryIndex {
+func DiffIndex(index1, index2 TokenDirectoryIndex) TokenDirectoryIndex {
+	if index1 == nil {
+		return index2
+	}
+	if index2 == nil {
+		return TokenDirectoryIndex{}
+	}
 	out := TokenDirectoryIndex{}
 
 	// Check for entries in index2 that are new or different from index1
@@ -512,10 +522,6 @@ func (d *TokenDirectory) DiffIndex(index1, index2 TokenDirectoryIndex) TokenDire
 	}
 
 	return out
-}
-
-func (d *TokenDirectory) UseCache() bool {
-	return !d.options.NoCache
 }
 
 func TokenDirectoryIndexURL() string {
