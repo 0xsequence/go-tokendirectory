@@ -38,7 +38,7 @@ type ContractInfoExtension struct {
 	BridgeInfo  map[string]struct {
 		TokenAddress string `json:"tokenAddress"`
 	} `json:"bridgeInfo,omitempty"`
-	IndexingInfo map[string]struct {
+	IndexingInfo struct {
 		UseOnChainBalance bool `json:"useOnChainBalance"`
 	} `json:"indexingInfo,omitempty"`
 
