@@ -415,7 +415,7 @@ func (d *TokenDirectory) FetchTokenContractInfo(ctx context.Context, index Token
 			if fi != fj {
 				return fi < fj // lower FeatureIndex first (ie. think like rank position: 1,2,3,etc.)
 			}
-			return uniqueList[i].Address < uniqueList[j].Address // then alpha by Address
+			return uniqueList[i].Name < uniqueList[j].Name // then alpha by Name
 		})
 		contractInfoMap[chainID] = uniqueList
 	}
@@ -550,6 +550,8 @@ func (d *TokenDirectory) FetchTokenList(ctx context.Context, tokenListURL string
 	// normalize/downcase all contract addresses in the token list
 	for i, token := range tokenList.Tokens {
 		tokenList.Tokens[i].Address = strings.ToLower(token.Address)
+		tokenList.Tokens[i].Name = strings.TrimSpace(token.Name)
+		tokenList.Tokens[i].Symbol = strings.TrimSpace(token.Symbol)
 	}
 
 	// Cache the token list if caching is enabled. Note: this will be evicted
