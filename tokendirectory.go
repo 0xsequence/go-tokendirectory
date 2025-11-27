@@ -391,7 +391,12 @@ func (d *TokenDirectory) FetchTokenContractInfo(ctx context.Context, index Token
 		uniqueMap := map[string]ContractInfo{}
 		for _, ci := range contractInfos {
 			key := fmt.Sprintf("%d-%s", ci.ChainID, ci.Address)
-			if ci.Address == "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" || ci.Address == "0x0000000000000000000000000000000000000000" {
+			if ci.Address == "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" {
+				// we skip the 0xee..ee entry, as we assume there is a 0x00..00 entry
+				// and prefer to avoid duplicates for the native token
+				continue
+			}
+			if ci.Address == "0x0000000000000000000000000000000000000000" {
 				ci.Extensions.Featured = true
 				ci.Extensions.FeatureIndex = -1000000 // ensure native tokens are always at the top
 			}
