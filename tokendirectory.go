@@ -393,7 +393,10 @@ func (d *TokenDirectory) FetchTokenContractInfo(ctx context.Context, index Token
 			key := fmt.Sprintf("%d-%s", ci.ChainID, ci.Address)
 			if ci.Address == "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" || ci.Address == "0x0000000000000000000000000000000000000000" {
 				ci.Extensions.Featured = true
-				ci.Extensions.FeatureIndex = 10000
+				ci.Extensions.FeatureIndex = -1000000 // ensure native tokens are always at the top
+			}
+			if ci.Extensions.FeatureIndex == 0 {
+				ci.Extensions.FeatureIndex = 1000000 // ensure non-featured tokens are at the bottom
 			}
 			uniqueMap[key] = ci // last one wins
 		}
@@ -405,7 +408,7 @@ func (d *TokenDirectory) FetchTokenContractInfo(ctx context.Context, index Token
 			fi := uniqueList[i].Extensions.FeatureIndex
 			fj := uniqueList[j].Extensions.FeatureIndex
 			if fi != fj {
-				return fi > fj // higher FeatureIndex first
+				return fi < fj // lower FeatureIndex first (ie. think like rank position: 1,2,3,etc.)
 			}
 			return uniqueList[i].Address < uniqueList[j].Address // then alpha by Address
 		})
