@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -65,6 +66,11 @@ type Options struct {
 	//
 	// Default is nil, which means all token list URLs will be fetched.
 	TokenListURLs []string
+
+	// OnlyERC20 is a flag to only include ERC20 token lists.
+	//
+	// Default is false, meaning all token standards will be included.
+	OnlyERC20 bool
 
 	// NoCache is a flag to disable the local token list cache.
 	// The cache works by checking the content hash of the Index
@@ -196,6 +202,10 @@ func (d *TokenDirectory) fetchIndex(ctx context.Context, optFilter ...IndexFilte
 		}
 
 		for file, hash := range tokenLists {
+			if name != "_external" && d.options.OnlyERC20 && file != "erc20.json" {
+				continue
+			}
+
 			tokenListURL := TokenDirectoryTokenListURL(name, file)
 			if len(d.options.TokenListURLs) > 0 && !slices.Contains(d.options.TokenListURLs, tokenListURL) {
 				continue
@@ -325,7 +335,84 @@ func (d *TokenDirectory) FetchTokenLists(ctx context.Context, index TokenDirecto
 			tokenLists[chainID] = append(tokenLists[chainID], tokenList)
 		}
 	}
+
 	return tokenLists, nil
+}
+
+func (d *TokenDirectory) FetchTokenContractInfo(ctx context.Context, index TokenDirectoryIndex) (map[uint64][]ContractInfo, error) {
+	tokenListMap, err := d.FetchTokenLists(ctx, index)
+	if err != nil {
+		return nil, err
+	}
+
+	contractInfoMap := map[uint64][]ContractInfo{}
+
+	// first include external token sources, as other lists will override to take
+	// precedence per chainID
+	externalList, ok := tokenListMap[0]
+	if ok {
+		for _, tokenList := range externalList {
+			contractInfoList := tokenList.Tokens
+			for _, ci := range contractInfoList {
+				chainID := ci.ChainID
+				if chainID == 0 {
+					return nil, fmt.Errorf("tokendirectory: token list contains token with chainID 0: %s", tokenList.TokenListURL)
+				}
+				if _, ok := contractInfoMap[chainID]; !ok {
+					contractInfoMap[chainID] = []ContractInfo{}
+				}
+				contractInfoMap[chainID] = append(contractInfoMap[chainID], ci)
+			}
+		}
+	}
+
+	// then include chain specific token lists, which will override external list
+	for tokenListChainID, tokenLists := range tokenListMap {
+		if tokenListChainID == 0 {
+			continue
+		}
+		for _, tokenList := range tokenLists {
+			contractInfoList := tokenList.Tokens
+			for _, ci := range contractInfoList {
+				if ci.ChainID == 0 {
+					return nil, fmt.Errorf("tokendirectory: token list contains token with chainID 0: %s", tokenList.TokenListURL)
+				}
+			}
+			if _, ok := contractInfoMap[tokenListChainID]; !ok {
+				contractInfoMap[tokenListChainID] = contractInfoList
+			} else {
+				contractInfoMap[tokenListChainID] = append(contractInfoMap[tokenListChainID], contractInfoList...)
+			}
+		}
+	}
+
+	// sort and deduplicate contract info per chainID
+	for chainID, contractInfos := range contractInfoMap {
+		uniqueMap := map[string]ContractInfo{}
+		for _, ci := range contractInfos {
+			key := fmt.Sprintf("%d-%s", ci.ChainID, ci.Address)
+			if ci.Address == "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" || ci.Address == "0x0000000000000000000000000000000000000000" {
+				ci.Extensions.Featured = true
+				ci.Extensions.FeatureIndex = 10000
+			}
+			uniqueMap[key] = ci // last one wins
+		}
+		uniqueList := []ContractInfo{}
+		for _, ci := range uniqueMap {
+			uniqueList = append(uniqueList, ci)
+		}
+		sort.Slice(uniqueList, func(i, j int) bool {
+			fi := uniqueList[i].Extensions.FeatureIndex
+			fj := uniqueList[j].Extensions.FeatureIndex
+			if fi != fj {
+				return fi > fj // higher FeatureIndex first
+			}
+			return uniqueList[i].Address < uniqueList[j].Address // then alpha by Address
+		})
+		contractInfoMap[chainID] = uniqueList
+	}
+
+	return contractInfoMap, nil
 }
 
 func (d *TokenDirectory) GetContentHashForTokenList(ctx context.Context, tokenListURL string) (string, bool, error) {
@@ -450,6 +537,11 @@ func (d *TokenDirectory) FetchTokenList(ctx context.Context, tokenListURL string
 		} else {
 			// all is good, no need to filter
 		}
+	}
+
+	// normalize/downcase all contract addresses in the token list
+	for i, token := range tokenList.Tokens {
+		tokenList.Tokens[i].Address = strings.ToLower(token.Address)
 	}
 
 	// Cache the token list if caching is enabled. Note: this will be evicted
