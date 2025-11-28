@@ -645,6 +645,12 @@ func filteredIndex(index TokenDirectoryIndex, filter *IndexFilter) TokenDirector
 		for _, chainID := range filter.ChainIDs {
 			out[chainID] = index[chainID]
 		}
+	} else {
+		for chainID, entries := range index {
+			if chainID != 0 {
+				out[chainID] = entries
+			}
+		}
 	}
 	if filter.External {
 		out[0] = index[0]
