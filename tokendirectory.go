@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,7 +25,7 @@ func NewTokenDirectory(options ...Options) *TokenDirectory {
 	if len(options) > 0 {
 		opts = options[0]
 	}
-	client := http.DefaultClient
+	client := &http.Client{Timeout: defaultHTTPTimeout}
 	if opts.HTTPClient != nil {
 		client = opts.HTTPClient
 	}
@@ -38,7 +39,7 @@ func NewTokenDirectory(options ...Options) *TokenDirectory {
 type Options struct {
 	// HTTPClient is the HTTP client to use for fetching the token directory.
 	//
-	// Default is http.DefaultClient.
+	// Default is a client with a 30 second timeout.
 	HTTPClient *http.Client
 
 	// ChainIDs is a list of chain IDs to fetch, acting as a filter on top of the index.
@@ -81,7 +82,39 @@ type Options struct {
 	NoCache bool
 }
 
-const tokenDirectoryBaseSourceURL = "https://raw.githubusercontent.com/0xsequence/token-directory/master/index"
+// Note: these are vars (not consts) only so that tests can point them at
+// httptest servers. Tests that mutate them must not run in parallel.
+var (
+	// tokenDirectoryBaseSourceURL is the primary source for the token directory
+	// index and token lists, served from the GitHub repository.
+	tokenDirectoryBaseSourceURL = "https://raw.githubusercontent.com/0xsequence/token-directory/master/index"
+
+	// tokenDirectoryFallbackSourceURL is the fallback source for the token
+	// directory index and token lists, served from a public GCS bucket mirror.
+	// It is used when the primary source is unavailable (e.g. rate limited or
+	// returning errors).
+	tokenDirectoryFallbackSourceURL = "https://storage.googleapis.com/token-directory-index/index"
+)
+
+// defaultHTTPTimeout is the timeout for the default HTTP client, so callers
+// who don't pass their own client (or a deadline on their context) don't
+// hang forever on a stalled source.
+//
+// Invariant: must exceed len(urls) × sourceAttemptTimeout in fetchFromURLs
+// (currently 2 × 10s), otherwise the client timeout preempts failover and
+// the fallback is never reached.
+const defaultHTTPTimeout = 30 * time.Second
+
+// sourceAttemptTimeout bounds how long a single source (primary or fallback)
+// can take before we move on to the next, so a stalled primary still leaves
+// room for the mirror. It is a var only so tests can shorten it.
+var sourceAttemptTimeout = 10 * time.Second
+
+// ErrSourceTimeout is reported (wrapped) when a single source exceeds
+// sourceAttemptTimeout while the caller's context is still alive. It lets
+// callers distinguish "the source was slow" (safe to retry) from the
+// caller's own context deadline expiring.
+var ErrSourceTimeout = errors.New("source timed out")
 
 type TokenDirectory struct {
 	options Options
@@ -144,23 +177,11 @@ func (d *TokenDirectory) fetchIndex(ctx context.Context, optFilter ...IndexFilte
 	}
 	d.mu.Unlock()
 
-	req, err := http.NewRequest("GET", TokenDirectoryIndexURL(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("tokendirectory: creating request: %w", err)
-	}
-	res, err := d.client.Do(req.WithContext(ctx))
+	// Fetch the index from the primary (GitHub) source, falling back to the
+	// GCS mirror if the primary is unavailable.
+	buf, err := d.fetchFromURLs(ctx, TokenDirectoryIndexURL(), TokenDirectoryFallbackIndexURL())
 	if err != nil {
 		return nil, fmt.Errorf("tokendirectory: fetching index.json: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("tokendirectory: fetching index.json: %s", res.Status)
-	}
-
-	buf, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("tokendirectory: reading index.jsonbody: %w", err)
 	}
 
 	var indexFile struct {
@@ -483,23 +504,15 @@ func (d *TokenDirectory) FetchTokenList(ctx context.Context, tokenListURL string
 		}
 	}
 
-	req, err := http.NewRequest("GET", tokenListURL, nil)
-	if err != nil {
-		return TokenList{}, fmt.Errorf("tokendirectory: failed to create request: %w", err)
+	// Fetch the token list from the primary (GitHub) source, falling back to
+	// the GCS mirror if the primary is unavailable.
+	urls := []string{tokenListURL}
+	if fallback := fallbackURLFor(tokenListURL); fallback != tokenListURL {
+		urls = append(urls, fallback)
 	}
-	res, err := d.client.Do(req.WithContext(ctx))
+	buf, err := d.fetchFromURLs(ctx, urls...)
 	if err != nil {
 		return TokenList{}, fmt.Errorf("tokendirectory: failed to fetch token list %s: %w", tokenListURL, err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return TokenList{}, fmt.Errorf("tokendirectory: failed to fetch token list %s", tokenListURL)
-	}
-
-	buf, err := io.ReadAll(res.Body)
-	if err != nil {
-		return TokenList{}, fmt.Errorf("tokendirectory: failed to read token list %s: %w", tokenListURL, err)
 	}
 
 	var tokenList TokenList
@@ -632,6 +645,84 @@ func TokenDirectoryIndexURL() string {
 
 func TokenDirectoryTokenListURL(group string, file string) string {
 	return fmt.Sprintf("%s/%s/%s", tokenDirectoryBaseSourceURL, group, file)
+}
+
+func TokenDirectoryFallbackIndexURL() string {
+	return fmt.Sprintf("%s/index.json", tokenDirectoryFallbackSourceURL)
+}
+
+func TokenDirectoryFallbackTokenListURL(group string, file string) string {
+	return fmt.Sprintf("%s/%s/%s", tokenDirectoryFallbackSourceURL, group, file)
+}
+
+// fallbackURLFor returns the fallback (GCS mirror) URL for the given primary
+// (GitHub) URL. URLs not served from the primary source are returned unchanged.
+func fallbackURLFor(url string) string {
+	if rest, ok := strings.CutPrefix(url, tokenDirectoryBaseSourceURL); ok {
+		return tokenDirectoryFallbackSourceURL + rest
+	}
+	return url
+}
+
+// fetchFromURLs fetches the given URLs in order and returns the body of the
+// first URL that responds with 200 OK. This is used to transparently fall
+// back to the GCS mirror when the primary GitHub source is unavailable
+// (e.g. rate limited, 5xx, stalled, or network errors). An error is returned
+// only if all URLs fail, joining the individual failures so no error is lost.
+func (d *TokenDirectory) fetchFromURLs(ctx context.Context, urls ...string) ([]byte, error) {
+	if len(urls) == 0 {
+		return nil, fmt.Errorf("no urls provided")
+	}
+	var errs []error
+	for _, url := range urls {
+		// bail out early if the caller canceled or timed out, keeping the
+		// errors collected so far
+		if err := ctx.Err(); err != nil {
+			return nil, errors.Join(append(errs, err)...)
+		}
+		// give each source its own budget so a stalled primary still leaves
+		// room for the mirror
+		attemptCtx, cancel := context.WithTimeout(ctx, sourceAttemptTimeout)
+		buf, err := d.fetchOnce(attemptCtx, url)
+		cancel()
+		if err == nil {
+			return buf, nil
+		}
+		// if the attempt timed out but the caller's context is still alive,
+		// surface a source timeout rather than the attempt's deadline, so
+		// callers don't mistake it for their own budget being spent
+		if ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+			err = fmt.Errorf("%w: %v", ErrSourceTimeout, err)
+		}
+		errs = append(errs, fmt.Errorf("fetching %s: %w", url, err))
+	}
+	return nil, errors.Join(errs...)
+}
+
+// fetchOnce fetches a single URL and returns its body if it responds with
+// 200 OK. The body is fully read before returning, so the caller may cancel
+// the context afterwards.
+func (d *TokenDirectory) fetchOnce(ctx context.Context, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	res, err := d.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		// drain the body so the connection can be reused
+		_, _ = io.Copy(io.Discard, res.Body)
+		return nil, fmt.Errorf("status %s", res.Status)
+	}
+	buf, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading body: %w", err)
+	}
+	return buf, nil
 }
 
 func filteredIndex(index TokenDirectoryIndex, filter *IndexFilter) TokenDirectoryIndex {
