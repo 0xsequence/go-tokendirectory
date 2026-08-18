@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -81,7 +82,30 @@ type Options struct {
 	NoCache bool
 }
 
-const tokenDirectoryBaseSourceURL = "https://raw.githubusercontent.com/0xsequence/token-directory/master/index"
+// Note: these are vars (not consts) only so that tests can point them at
+// httptest servers. Tests that mutate them must not run in parallel.
+var (
+	// tokenDirectoryBaseSourceURL is the primary source for the token directory
+	// index and token lists, served from the GitHub repository.
+	tokenDirectoryBaseSourceURL = "https://raw.githubusercontent.com/0xsequence/token-directory/master/index"
+
+	// tokenDirectoryFallbackSourceURL is the fallback source for the token
+	// directory index and token lists, served from a public GCS bucket mirror.
+	// It is used when the primary source is unavailable (e.g. rate limited or
+	// returning errors).
+	tokenDirectoryFallbackSourceURL = "https://storage.googleapis.com/token-directory-index/index"
+)
+
+// sourceAttemptTimeout bounds how long a single source (primary or fallback)
+// can take before we move on to the next, so a stalled primary still leaves
+// room for the mirror. It is a var only so tests can shorten it.
+var sourceAttemptTimeout = 10 * time.Second
+
+// ErrSourceTimeout is reported (wrapped) when a single source exceeds
+// sourceAttemptTimeout while the caller's context is still alive. It lets
+// callers distinguish "the source was slow" (safe to retry) from the
+// caller's own context deadline expiring.
+var ErrSourceTimeout = errors.New("source timed out")
 
 type TokenDirectory struct {
 	options Options
@@ -89,6 +113,7 @@ type TokenDirectory struct {
 
 	index          TokenDirectoryIndex
 	indexFetchedAt time.Time
+	preferFallback bool
 
 	tokenListCache map[string]TokenList
 
@@ -108,6 +133,14 @@ type IndexFilter struct {
 
 	// Deprecated flag will return just the deprecated token lists.
 	Deprecated bool
+}
+
+type tokenDirectoryIndexFile struct {
+	Index map[string]struct {
+		ChainID    uint64            `json:"chainId"`
+		Deprecated bool              `json:"deprecated"`
+		TokenLists map[string]string `json:"tokenLists"`
+	} `json:"index"`
 }
 
 func (d *TokenDirectory) FetchIndex(ctx context.Context, optFilter ...IndexFilter) (TokenDirectoryIndex, error) {
@@ -144,35 +177,30 @@ func (d *TokenDirectory) fetchIndex(ctx context.Context, optFilter ...IndexFilte
 	}
 	d.mu.Unlock()
 
-	req, err := http.NewRequest("GET", TokenDirectoryIndexURL(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("tokendirectory: creating request: %w", err)
+	// Fetch the index from the primary (GitHub) source, falling back to the
+	// GCS mirror if the primary is unavailable.
+	var indexFile tokenDirectoryIndexFile
+	validateIndex := func(buf []byte) error {
+		var candidate tokenDirectoryIndexFile
+		if err := json.Unmarshal(buf, &candidate); err != nil {
+			return fmt.Errorf("unmarshalling index.json: %w", err)
+		}
+		if candidate.Index == nil {
+			return fmt.Errorf("index.json is missing index")
+		}
+		indexFile = candidate
+		return nil
 	}
-	res, err := d.client.Do(req.WithContext(ctx))
+
+	_, err := d.fetchManagedURLs(
+		ctx,
+		TokenDirectoryIndexURL(),
+		TokenDirectoryFallbackIndexURL(),
+		true,
+		validateIndex,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("tokendirectory: fetching index.json: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("tokendirectory: fetching index.json: %s", res.Status)
-	}
-
-	buf, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("tokendirectory: reading index.jsonbody: %w", err)
-	}
-
-	var indexFile struct {
-		Index map[string]struct {
-			ChainID    uint64            `json:"chainId"`
-			Deprecated bool              `json:"deprecated"`
-			TokenLists map[string]string `json:"tokenLists"`
-		} `json:"index"`
-	}
-
-	if err := json.Unmarshal(buf, &indexFile); err != nil {
-		return nil, fmt.Errorf("tokendirectory: unmarshalling index.json: %w", err)
 	}
 
 	tdIndex := TokenDirectoryIndex{}
@@ -261,7 +289,7 @@ func (d *TokenDirectory) FetchChainTokenLists(ctx context.Context, chainID uint6
 		}
 
 		for _, entry := range indexEntries {
-			tokenList, err := d.FetchTokenList(ctx, entry.TokenListURL)
+			tokenList, err := d.fetchTokenList(ctx, entry.TokenListURL, entry.ContentHash)
 			if err != nil {
 				return nil, err
 			}
@@ -299,7 +327,7 @@ func (d *TokenDirectory) FetchExternalTokenLists(ctx context.Context) ([]TokenLi
 		}
 
 		for _, entry := range indexEntries {
-			tokenList, err := d.FetchTokenList(ctx, entry.TokenListURL)
+			tokenList, err := d.fetchTokenList(ctx, entry.TokenListURL, entry.ContentHash)
 			if err != nil {
 				return nil, err
 			}
@@ -328,7 +356,7 @@ func (d *TokenDirectory) FetchTokenLists(ctx context.Context, index TokenDirecto
 	for chainID, entries := range index {
 		tokenLists[chainID] = []TokenList{}
 		for _, entry := range entries {
-			tokenList, err := d.FetchTokenList(ctx, entry.TokenListURL)
+			tokenList, err := d.fetchTokenList(ctx, entry.TokenListURL, entry.ContentHash)
 			if err != nil {
 				return nil, err
 			}
@@ -467,48 +495,65 @@ func (d *TokenDirectory) GetExternalTokenListURLs(ctx context.Context) ([]string
 }
 
 func (d *TokenDirectory) FetchTokenList(ctx context.Context, tokenListURL string) (TokenList, error) {
+	var expectedContentHash string
+	if fallbackURLFor(tokenListURL) != tokenListURL {
+		if hash, ok, err := d.GetContentHashForTokenList(ctx, tokenListURL); err == nil && ok {
+			expectedContentHash = hash
+		}
+	}
+	return d.fetchTokenList(ctx, tokenListURL, expectedContentHash)
+}
+
+func (d *TokenDirectory) fetchTokenList(ctx context.Context, tokenListURL string, expectedContentHash string) (TokenList, error) {
 	if d.UseCache() {
 		d.mu.Lock()
 		tokenList, ok := d.tokenListCache[tokenListURL]
 		d.mu.Unlock()
 
 		if ok && tokenList.ContentHash != "" {
-			indexedContentHash, ok, err := d.GetContentHashForTokenList(ctx, tokenListURL)
-			if err != nil {
-				return TokenList{}, fmt.Errorf("tokendirectory: failed to get content hash for token list %s: %w", tokenListURL, err)
+			indexedContentHash := expectedContentHash
+			indexedContentHashFound := indexedContentHash != ""
+			if !indexedContentHashFound {
+				var err error
+				indexedContentHash, indexedContentHashFound, err = d.GetContentHashForTokenList(ctx, tokenListURL)
+				if err != nil {
+					return TokenList{}, fmt.Errorf("tokendirectory: failed to get content hash for token list %s: %w", tokenListURL, err)
+				}
 			}
-			if ok && tokenList.ContentHash == indexedContentHash {
+			if indexedContentHashFound && tokenList.ContentHash == indexedContentHash {
 				return tokenList, nil
 			}
 		}
 	}
 
-	req, err := http.NewRequest("GET", tokenListURL, nil)
-	if err != nil {
-		return TokenList{}, fmt.Errorf("tokendirectory: failed to create request: %w", err)
+	var tokenList TokenList
+	var contentHash string
+	validateTokenList := func(buf []byte) error {
+		var candidate TokenList
+		if err := json.Unmarshal(buf, &candidate); err != nil {
+			return fmt.Errorf("unmarshalling token list: %w", err)
+		}
+		candidateHash := sha256Hash(buf)
+		if expectedContentHash != "" && candidateHash != expectedContentHash {
+			return fmt.Errorf("content hash mismatch: expected %s, got %s", expectedContentHash, candidateHash)
+		}
+		tokenList = candidate
+		contentHash = candidateHash
+		return nil
 	}
-	res, err := d.client.Do(req.WithContext(ctx))
+
+	var err error
+	if fallback := fallbackURLFor(tokenListURL); fallback != tokenListURL {
+		_, err = d.fetchManagedURLs(ctx, tokenListURL, fallback, false, validateTokenList)
+	} else {
+		_, err = d.fetchFromSources(ctx, validateTokenList, fetchSource{url: tokenListURL})
+	}
 	if err != nil {
 		return TokenList{}, fmt.Errorf("tokendirectory: failed to fetch token list %s: %w", tokenListURL, err)
 	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return TokenList{}, fmt.Errorf("tokendirectory: failed to fetch token list %s", tokenListURL)
-	}
-
-	buf, err := io.ReadAll(res.Body)
-	if err != nil {
-		return TokenList{}, fmt.Errorf("tokendirectory: failed to read token list %s: %w", tokenListURL, err)
-	}
-
-	var tokenList TokenList
-	if err := json.Unmarshal(buf, &tokenList); err != nil {
-		return TokenList{}, fmt.Errorf("tokendirectory: failed to unmarshal token list %s: %w", tokenListURL, err)
-	}
 
 	tokenList.TokenListURL = tokenListURL
-	tokenList.ContentHash = sha256Hash(buf)
+	tokenList.ContentHash = contentHash
 
 	var deprecated bool
 	index, _ := d.fetchIndex(ctx)
@@ -632,6 +677,143 @@ func TokenDirectoryIndexURL() string {
 
 func TokenDirectoryTokenListURL(group string, file string) string {
 	return fmt.Sprintf("%s/%s/%s", tokenDirectoryBaseSourceURL, group, file)
+}
+
+func TokenDirectoryFallbackIndexURL() string {
+	return fmt.Sprintf("%s/index.json", tokenDirectoryFallbackSourceURL)
+}
+
+func TokenDirectoryFallbackTokenListURL(group string, file string) string {
+	return fmt.Sprintf("%s/%s/%s", tokenDirectoryFallbackSourceURL, group, file)
+}
+
+// fallbackURLFor returns the fallback (GCS mirror) URL for the given primary
+// (GitHub) URL. URLs not served from the primary source are returned unchanged.
+func fallbackURLFor(url string) string {
+	if rest, ok := strings.CutPrefix(url, tokenDirectoryBaseSourceURL); ok {
+		return tokenDirectoryFallbackSourceURL + rest
+	}
+	return url
+}
+
+type fetchSource struct {
+	url       string
+	isPrimary bool
+}
+
+type responseValidator func([]byte) error
+
+// fetchManagedURLs fetches a primary/fallback pair. Index refreshes probe the
+// primary so it can recover; token-list requests prefer the fallback after a
+// primary failure until the next index refresh.
+func (d *TokenDirectory) fetchManagedURLs(
+	ctx context.Context,
+	primaryURL string,
+	fallbackURL string,
+	probePrimary bool,
+	validate responseValidator,
+) ([]byte, error) {
+	d.mu.Lock()
+	preferFallback := d.preferFallback
+	d.mu.Unlock()
+
+	sources := []fetchSource{
+		{url: primaryURL, isPrimary: true},
+		{url: fallbackURL},
+	}
+	if preferFallback && !probePrimary {
+		slices.Reverse(sources)
+	}
+	return d.fetchFromSources(ctx, validate, sources...)
+}
+
+// fetchFromURLs fetches the given URLs in order and returns the body of the
+// first URL that responds with 200 OK. This is used to transparently fall
+// back to the GCS mirror when the primary GitHub source is unavailable
+// (e.g. rate limited, 5xx, stalled, or network errors). An error is returned
+// only if all URLs fail, joining the individual failures so no error is lost.
+func (d *TokenDirectory) fetchFromURLs(ctx context.Context, urls ...string) ([]byte, error) {
+	sources := make([]fetchSource, len(urls))
+	for i, url := range urls {
+		sources[i] = fetchSource{url: url}
+	}
+	return d.fetchFromSources(ctx, nil, sources...)
+}
+
+func (d *TokenDirectory) fetchFromSources(ctx context.Context, validate responseValidator, sources ...fetchSource) ([]byte, error) {
+	if len(sources) == 0 {
+		return nil, fmt.Errorf("no urls provided")
+	}
+	var errs []error
+	for _, source := range sources {
+		// bail out early if the caller canceled or timed out, keeping the
+		// errors collected so far
+		if err := ctx.Err(); err != nil {
+			return nil, errors.Join(append(errs, err)...)
+		}
+
+		attemptCtx := ctx
+		cancel := func() {}
+		if len(sources) > 1 {
+			// Give failover sources their own budgets. A single arbitrary URL
+			// continues to honor only the caller context and configured client.
+			attemptCtx, cancel = context.WithTimeout(ctx, sourceAttemptTimeout)
+		}
+		buf, err := d.fetchOnce(attemptCtx, source.url)
+		if err == nil && validate != nil {
+			if validationErr := validate(buf); validationErr != nil {
+				err = fmt.Errorf("validating response: %w", validationErr)
+			}
+		}
+		cancel()
+		if err == nil {
+			if source.isPrimary {
+				d.mu.Lock()
+				d.preferFallback = false
+				d.mu.Unlock()
+			}
+			return buf, nil
+		}
+		if source.isPrimary && ctx.Err() == nil {
+			d.mu.Lock()
+			d.preferFallback = true
+			d.mu.Unlock()
+		}
+		// if the attempt timed out but the caller's context is still alive,
+		// surface a source timeout rather than the attempt's deadline, so
+		// callers don't mistake it for their own budget being spent
+		if ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+			err = fmt.Errorf("%w: %v", ErrSourceTimeout, err)
+		}
+		errs = append(errs, fmt.Errorf("fetching %s: %w", source.url, err))
+	}
+	return nil, errors.Join(errs...)
+}
+
+// fetchOnce fetches a single URL and returns its body if it responds with
+// 200 OK. The body is fully read before returning, so the caller may cancel
+// the context afterwards.
+func (d *TokenDirectory) fetchOnce(ctx context.Context, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	res, err := d.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		// drain the body so the connection can be reused
+		_, _ = io.Copy(io.Discard, res.Body)
+		return nil, fmt.Errorf("status %s", res.Status)
+	}
+	buf, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading body: %w", err)
+	}
+	return buf, nil
 }
 
 func filteredIndex(index TokenDirectoryIndex, filter *IndexFilter) TokenDirectoryIndex {
