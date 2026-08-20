@@ -50,6 +50,9 @@ type ContractInfoExtension struct {
 	Blacklist bool `json:"blacklist,omitempty"`
 	Mute      bool `json:"mute,omitempty"`
 
+	// FeeOnTransfer marks tokens that deduct a fee/tax on transfer.
+	FeeOnTransfer bool `json:"feeOnTransfer,omitempty"`
+
 	SupportsDecimals bool `json:"supportsDecimals,omitempty"`
 
 	Featured     bool `json:"featured,omitempty"`
