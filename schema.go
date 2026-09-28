@@ -53,6 +53,9 @@ type ContractInfoExtension struct {
 	// FeeOnTransfer marks tokens that deduct a fee/tax on transfer.
 	FeeOnTransfer bool `json:"feeOnTransfer,omitempty"`
 
+	// Rebasing marks tokens whose balances change without a transfer (Aave aTokens, stETH, AMPL).
+	Rebasing bool `json:"rebasing,omitempty"`
+
 	SupportsDecimals bool `json:"supportsDecimals,omitempty"`
 
 	Featured     bool `json:"featured,omitempty"`
